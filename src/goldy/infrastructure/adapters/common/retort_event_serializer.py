@@ -1,7 +1,7 @@
 import json
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Final, final, override
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from adaptix import Retort, dumper
 
@@ -10,7 +10,6 @@ from goldy.application.common.ports.outbox import (
     OutboxMessage,
 )
 from goldy.domain.common.event import Event
-from goldy.domain.common.event_id import EventId
 
 _retort: Final[Retort] = Retort(
     recipe=[
@@ -31,12 +30,10 @@ class RetortEventSerializer(EventSerializer):
 
     @override
     def serialize(self, event: Event) -> OutboxMessage:
-        event.set_event_id(EventId(uuid4()))
-        event.set_event_date(datetime.now(UTC))
 
         return OutboxMessage(
-            id=uuid4(),
+            id=event.event_id,
             event_type=event.event_type,
             payload=json.dumps(_retort.dump(event)),
-            created_at=datetime.now(UTC),
+            created_at=event.event_date,
         )

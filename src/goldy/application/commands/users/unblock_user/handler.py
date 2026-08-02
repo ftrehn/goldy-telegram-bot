@@ -1,0 +1,40 @@
+from typing import Final, override
+
+from goldy.application.commands.users.unblock_user.command import UnblockUserCommand
+from goldy.application.common.mediator.handlers import CommandHandler
+from goldy.application.common.ports.mappers import UserViewMapper
+from goldy.application.common.services.user_provider import UserProvider
+from goldy.application.common.views.user import UserView
+from goldy.domain.users.services.access_service import AccessService
+from goldy.domain.users.services.authorization.permission import (
+    CanManageSubordinate,
+    UserManagementContext,
+)
+from goldy.domain.users.values.user_id import UserId
+
+
+class UnblockUserHandler(CommandHandler[UnblockUserCommand, UserView]):
+    """Unblocks someone the caller outranks."""
+
+    def __init__(
+        self,
+        user_provider: UserProvider,
+        access_service: AccessService,
+        user_view_mapper: UserViewMapper,
+    ) -> None:
+        self._user_provider: Final[UserProvider] = user_provider
+        self._access_service: Final[AccessService] = access_service
+        self._user_view_mapper: Final[UserViewMapper] = user_view_mapper
+
+    @override
+    async def handle(self, command: UnblockUserCommand) -> UserView:
+        subject = await self._user_provider.current()
+        target = await self._user_provider.by_id(UserId(command.user_id))
+
+        self._access_service.authorize(
+            CanManageSubordinate(),
+            context=UserManagementContext(subject=subject, target=target),
+        )
+
+        target.unblock()
+        return self._user_view_mapper.to_view(target)

@@ -1,15 +1,13 @@
 import logging
 from typing import Final, override
 
-from goldy.application.commands.outbox.relay_outbox.command import (
-    RelayOutboxCommand,
-    RelayOutboxResponse,
-)
+from goldy.application.commands.outbox.relay_outbox.command import RelayOutboxCommand
 from goldy.application.common.mediator.handlers import CommandHandler
 from goldy.application.common.ports.outbox import (
     OutboxCommandGateway,
     OutboxPublisher,
 )
+from goldy.application.common.views.outbox import RelayOutboxResponse
 from goldy.domain.common.error import AppError
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)

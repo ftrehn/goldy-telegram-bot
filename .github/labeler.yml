@@ -1,0 +1,76 @@
+# Auto-label PRs by changed paths (actions/labeler v6).
+
+"layer: domain":
+  - changed-files:
+      - any-glob-to-any-file: "src/goldy/domain/**"
+
+"layer: application":
+  - changed-files:
+      - any-glob-to-any-file: "src/goldy/application/**"
+
+"layer: infrastructure":
+  - changed-files:
+      - any-glob-to-any-file: "src/goldy/infrastructure/**"
+
+"layer: presentation":
+  - changed-files:
+      - any-glob-to-any-file: "src/goldy/presentation/**"
+
+"layer: setup":
+  - changed-files:
+      - any-glob-to-any-file: "src/goldy/setup/**"
+
+"area: telegram":
+  - changed-files:
+      - any-glob-to-any-file: "src/goldy/presentation/telegram/**"
+
+# Locales are a data directory, not a package — a change here is a wording
+# change and reviews differently from a handler change.
+"area: locales":
+  - changed-files:
+      - any-glob-to-any-file: "src/goldy/presentation/telegram/locales/**"
+
+"area: migrations":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "src/goldy/infrastructure/persistence/migrations/**"
+          - "alembic.ini"
+
+"area: tests":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tests/**"
+          - "pytest.ini"
+          - ".coveragerc"
+
+"area: ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/**"
+          - ".coderabbit.yaml"
+          - "sonar-project.properties"
+
+"area: tooling":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "justfile"
+          - "ruff.toml"
+          - "mypy.ini"
+          - ".importlinter"
+          - ".pre-commit-config.yaml"
+          - "pyproject.toml"
+          - "uv.lock"
+
+"area: agents":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "AGENTS.md"
+          - "CLAUDE.md"
+          - "CONTEXT.md"
+          - ".claude/**"
+
+"area: docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.md"
+          - "docs/**"

@@ -1,0 +1,76 @@
+name: Bug report
+description: Something behaves differently from what it should
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Telegram bot (commands, dialogs, middlewares)
+        - Registration / account linking
+        - Authorization (roles, blocking, admin actions)
+        - Worker (outbox publishing, background tasks)
+        - Scheduler (outbox relay)
+        - Migrations
+        - Configuration / startup
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: chat-type
+    attributes:
+      label: Where did it happen?
+      description: >-
+        Telegram delivers updates differently in groups — `/start@goldy_bot`
+        instead of `/start`, and a contact card that may belong to someone else.
+        More than one bug here has existed only in one chat type.
+      options:
+        - Private chat
+        - Group
+        - Supergroup / channel
+        - Not applicable
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: >-
+        The sequence of messages or button presses, or a failing test. If the
+        update matters — a shared contact, a deep link payload, a forwarded
+        message — say which.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traceback
+      description: Redact bot tokens, phone numbers and connection strings before pasting.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Tag, commit SHA, or image tag.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Python version, OS, and how it is running (compose, image, local).

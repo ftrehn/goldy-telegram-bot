@@ -1,0 +1,46 @@
+version: 2
+updates:
+  - package-ecosystem: uv
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore"
+      include: scope
+    groups:
+      python-minor-patch:
+        update-types: ["minor", "patch"]
+      # aiogram, aiogram-dialog and aiogram-i18n track each other's API; bumping
+      # one alone is how a dialog stops rendering.
+      aiogram:
+        patterns:
+          - "aiogram*"
+      taskiq:
+        patterns:
+          - "taskiq*"
+    ignore:
+      # A major bump here is a deliberate migration, not a dependency update.
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+      # aiogram majors rewrite the handler and filter API, and the whole
+      # presentation layer is written against it.
+      - dependency-name: "aiogram"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "aiogram-dialog"
+        update-types: ["version-update:semver-major"]
+      # dishka majors change scope and provider semantics, which the per-process
+      # containers depend on.
+      - dependency-name: "dishka"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "ci"

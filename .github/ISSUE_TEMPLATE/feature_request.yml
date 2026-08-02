@@ -1,0 +1,44 @@
+name: Feature request
+description: Propose a capability or a change in behaviour
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What can a customer or an administrator not do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: >-
+        What should happen instead? Use the words in CONTEXT.md — user, phone
+        number, external id, linking, notification target — rather than a
+        synonym.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part does this belong to?
+      description: See AGENTS.md. Pick "Not sure" rather than guessing.
+      options:
+        - Users (identity, linking, roles, authorization)
+        - Catalog (products read from 1C)
+        - Orders
+        - Telegram presentation (commands, dialogs, wording)
+        - MAX presentation — planned
+        - Events, outbox and background work
+        - Cross-cutting (config, deployment, tooling)
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

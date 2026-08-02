@@ -3,7 +3,7 @@ from typing import Protocol
 
 from goldy.domain.common.event import Event
 
-from .outbox_message import OutboxMessage
+from application.common.ports.outbox.outbox_message import OutboxMessage
 
 
 class EventSerializer(Protocol):

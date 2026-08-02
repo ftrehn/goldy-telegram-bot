@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Protocol
 
-from .outbox_message import OutboxMessage
+from application.common.ports.outbox.outbox_message import OutboxMessage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

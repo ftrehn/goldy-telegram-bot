@@ -1,0 +1,54 @@
+import logging
+from typing import Any, Final, override
+
+from goldy.application.common.mediator.handlers import (
+    HandleNext,
+    PipelineHandler,
+)
+from goldy.application.common.mediator.markers import Command
+from goldy.application.common.ports.outbox.event_bus import EventBus
+from goldy.domain.common.events_collection import EventsCollection
+
+logger: Final[logging.Logger] = logging.getLogger(__name__)
+
+
+class EventsPipeline[TCommand: Command[Any], TResponse](
+    PipelineHandler[TCommand, TResponse],
+):
+    """Drains and publishes the domain events collected during a command.
+
+    ``EventsCollection`` is request-scoped and shared with the aggregates built
+    inside the handler, so after the handler succeeds this pipeline pulls the
+    events it recorded and hands them to the bus. It must run *inside* the
+    transaction pipeline, so the events are persisted (to the outbox) atomically
+    with the state change; on failure the handler raises, nothing is pulled, and
+    the events are discarded with the rollback.
+    """
+
+    def __init__(
+        self,
+        events_collection: EventsCollection,
+        event_bus: EventBus,
+    ) -> None:
+        self._events_collection: Final[EventsCollection] = events_collection
+        self._event_bus: Final[EventBus] = event_bus
+
+    @override
+    async def handle(
+        self,
+        request: TCommand,
+        handle_next: HandleNext[TCommand, TResponse],
+    ) -> TResponse:
+        response = await handle_next(request)
+
+        events = list(self._events_collection.pull_events())
+        log = logger.info if events else logger.debug
+        log(
+            "events: %s produced %d event(s): %s",
+            type(request).__name__,
+            len(events),
+            [type(event).__name__ for event in events],
+        )
+
+        await self._event_bus.publish(events)
+        return response

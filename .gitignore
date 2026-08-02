@@ -173,3 +173,4 @@ junit.xml
 
 # Excel owner-lock files, written next to an open workbook
 ~$*
+.codegraph/

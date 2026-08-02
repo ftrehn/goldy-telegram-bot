@@ -1,0 +1,23 @@
+[run]
+parallel = True
+data_file = .coverage
+source = src
+omit =
+    tests/*
+    src/goldy/_version.py
+    ; Entry points: assembly only, and nothing to assert without standing the
+    ; process up. What they build is covered through the integration container.
+    src/goldy/fastapi_app.py
+    src/goldy/worker_app.py
+    src/goldy/scheduler_app.py
+    src/goldy/infrastructure/persistence/migrations/*
+
+[report]
+show_missing = True
+skip_covered = True
+exclude_lines =
+    pragma: no cover
+    pragma: no coverage
+    if TYPE_CHECKING:
+    ^\s*\.\.\.$
+    @(abc\.)?abstractmethod

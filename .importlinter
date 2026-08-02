@@ -1,0 +1,48 @@
+[importlinter]
+root_package = goldy
+
+
+[importlinter:contract:architecture_layers]
+name = Clean architecture layers (presentation -> application -> domain)
+type = layers
+layers =
+    goldy.presentation
+    goldy.application
+    goldy.domain
+
+
+[importlinter:contract:protected_application_handlers]
+name = Application command/query handlers are protected
+type = protected
+protected_modules =
+    goldy.application.commands
+    goldy.application.queries
+allowed_importers =
+    goldy.application
+    goldy.presentation
+    goldy.setup
+    goldy.infrastructure.task_manager
+
+
+[importlinter:contract:protected_application_ports]
+name = Application ports are implemented only by infrastructure adapters
+type = protected
+protected_modules =
+    goldy.application.common.ports
+allowed_importers =
+    goldy.application
+    goldy.presentation
+    goldy.infrastructure.adapters
+    goldy.infrastructure.mappers
+    goldy.infrastructure.task_manager
+    goldy.setup
+
+
+[importlinter:contract:protected_infrastructure_adapters]
+name = Infrastructure adapters are wired only from setup
+type = protected
+protected_modules =
+    goldy.infrastructure.adapters
+allowed_importers =
+    goldy.infrastructure
+    goldy.setup

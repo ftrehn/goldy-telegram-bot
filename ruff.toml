@@ -71,6 +71,10 @@ ignore = [
     "INP001",
     "D415",
 ]
+# aiogram-dialog awaits every window getter, so they are async by contract even
+# when a particular one has nothing to await. Making them sync breaks the
+# protocol; the rule cannot see that.
+"src/goldy/presentation/telegram/handlers/**/getters.py" = ["RUF029"]
 # Tests: asserts are the point (S101); fake credentials and magic literals are
 # expected fixture data (S105/S106/S107/PLR2004); object-mother factories take
 # many keyword args (PLR0913); private access is fine in tests (SLF001).

@@ -1,19 +1,23 @@
 from typing import Final
 
 from aiogram import Dispatcher, Router
+from aiogram_dialog import Dialog
 
 from goldy.presentation.telegram.handlers.common.fallback import (
     router as fallback_router,
 )
 from goldy.presentation.telegram.handlers.common.help import router as help_router
-from goldy.presentation.telegram.handlers.common.me import router as me_router
 from goldy.presentation.telegram.handlers.errors import router as errors_router
+from goldy.presentation.telegram.handlers.profile import (
+    PROFILE_DIALOG,
+    router as profile_router,
+)
 from goldy.presentation.telegram.handlers.start.handler import router as start_router
 
 ROUTERS: Final[tuple[Router, ...]] = (
     start_router,
     help_router,
-    me_router,
+    profile_router,
     fallback_router,
     errors_router,
 )
@@ -23,6 +27,9 @@ Order is load-bearing at the end. ``fallback_router`` matches everything, so
 anything below it would never run; ``errors_router`` observes failures rather
 than messages, and sits last to say so.
 """
+
+DIALOGS: Final[tuple[Dialog, ...]] = (PROFILE_DIALOG,)
+"""Dialogs, which are routers too — aiogram-dialog builds them as such."""
 
 
 def setup_all_handlers(dp: Dispatcher) -> None:
@@ -34,6 +41,9 @@ def setup_all_handlers(dp: Dispatcher) -> None:
 def setup_all_dialogs(dp: Dispatcher) -> None:
     """Attaches every aiogram-dialog window.
 
-    Empty until the profile and admin screens land — those are the ones with
-    state worth a dialog. Commands without state stay ordinary handlers.
+    Separate from the handlers because ``setup_dialogs`` has to run after them
+    — it registers the machinery the dialogs need, and it needs to see them
+    first.
     """
+    for dialog in DIALOGS:
+        dp.include_router(dialog)

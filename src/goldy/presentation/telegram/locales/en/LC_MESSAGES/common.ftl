@@ -44,3 +44,15 @@ me-profile =
 
 unknown-command = I do not understand. Send /help to see what I can do.
 cancelled = Cancelled. Send /help if you need a reminder.
+
+profile-rename-button = Change name
+profile-locale-button = Language
+profile-notifications-button = Notifications
+profile-accounts-button = Unlink a messenger
+profile-marketing-button = Toggle marketing
+profile-close-button = Close
+profile-back-button = Back
+profile-rename-prompt = Send your new name. A surname after a space is fine.
+profile-locale-prompt = Pick a language.
+profile-notifications-prompt = Notifications currently go to { $notify }. Where to?
+profile-accounts-prompt = Which messenger should I unlink?

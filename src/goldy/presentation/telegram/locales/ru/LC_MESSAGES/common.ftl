@@ -44,3 +44,15 @@ me-profile =
 
 unknown-command = Не понимаю. Наберите /help, чтобы увидеть список команд.
 cancelled = Отменил. Наберите /help, если нужна подсказка.
+
+profile-rename-button = Изменить имя
+profile-locale-button = Язык
+profile-notifications-button = Уведомления
+profile-accounts-button = Отвязать мессенджер
+profile-marketing-button = Переключить рассылку
+profile-close-button = Закрыть
+profile-back-button = Назад
+profile-rename-prompt = Отправьте новое имя. Можно с фамилией через пробел.
+profile-locale-prompt = Выберите язык.
+profile-notifications-prompt = Сейчас уведомления приходят в { $notify }. Куда слать?
+profile-accounts-prompt = Какой мессенджер отвязать?

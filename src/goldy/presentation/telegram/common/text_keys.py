@@ -45,3 +45,16 @@ showing it.
 ME_PROFILE: Final[str] = "me-profile"
 UNKNOWN_COMMAND: Final[str] = "unknown-command"
 CANCELLED: Final[str] = "cancelled"
+
+# The profile dialog.
+PROFILE_RENAME_BUTTON: Final[str] = "profile-rename-button"
+PROFILE_LOCALE_BUTTON: Final[str] = "profile-locale-button"
+PROFILE_NOTIFICATIONS_BUTTON: Final[str] = "profile-notifications-button"
+PROFILE_ACCOUNTS_BUTTON: Final[str] = "profile-accounts-button"
+PROFILE_MARKETING_BUTTON: Final[str] = "profile-marketing-button"
+PROFILE_CLOSE_BUTTON: Final[str] = "profile-close-button"
+PROFILE_BACK_BUTTON: Final[str] = "profile-back-button"
+PROFILE_RENAME_PROMPT: Final[str] = "profile-rename-prompt"
+PROFILE_LOCALE_PROMPT: Final[str] = "profile-locale-prompt"
+PROFILE_NOTIFICATIONS_PROMPT: Final[str] = "profile-notifications-prompt"
+PROFILE_ACCOUNTS_PROMPT: Final[str] = "profile-accounts-prompt"

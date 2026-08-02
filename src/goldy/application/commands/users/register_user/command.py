@@ -26,3 +26,5 @@ class RegisterUserCommand(Command[UserView]):
     first_name: str
     last_name: str | None = None
     username: str | None = None
+    language_code: str | None = None
+    """As the platform reports it. Anything untranslated becomes the default."""

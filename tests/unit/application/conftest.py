@@ -11,15 +11,11 @@ from goldy.domain.common.events_collection import EventsCollection
 from goldy.domain.users.entities.user import User
 from goldy.domain.users.factories.user_factory import UserFactory
 from goldy.domain.users.services.access_service import AccessService
-from goldy.domain.users.values.messenger_platform import MessengerPlatform
 from goldy.domain.users.values.user_id import UserId
 from goldy.domain.users.values.user_role import UserRole
 from goldy.infrastructure.mappers.adaptix_user_view_mapper import AdaptixUserViewMapper
-from tests.unit.factories.domain_factories import (
-    make_external_account_id,
-    make_full_name,
-    make_phone_number,
-)
+from tests.unit.factories.domain_factories import make_account, make_registration
+from tests.unit.stubs.admin import StubAdminRegistry
 from tests.unit.stubs.gateways import InMemoryUserCommandGateway
 from tests.unit.stubs.identity import (
     StubIdentityProvider,
@@ -76,6 +72,12 @@ def access_service() -> AccessService:
 
 
 @pytest.fixture()
+def admin_registry() -> StubAdminRegistry:
+    """Empty by default — a test that cares about seeding overrides it."""
+    return StubAdminRegistry()
+
+
+@pytest.fixture()
 def user_view_mapper() -> UserViewMapper:
     """The real converter — it is pure, so stubbing it would only hide bugs."""
     return AdaptixUserViewMapper()
@@ -94,10 +96,10 @@ def seed_user(
         role: UserRole = UserRole.CUSTOMER,
     ) -> User:
         user = user_factory.create(
-            phone_number=make_phone_number(phone_number),
-            full_name=make_full_name(),
-            platform=MessengerPlatform.TELEGRAM,
-            external_id=make_external_account_id(external_id),
+            make_registration(
+                phone_number=phone_number,
+                account=make_account(external_id=external_id),
+            ),
         )
         if role is not UserRole.CUSTOMER:
             user.assign_role(role)

@@ -1,7 +1,8 @@
 import logging
 from typing import Final
 
-from taskiq import AsyncBroker, ScheduleSource, async_shared_broker
+from faststream.rabbit import RabbitBroker
+from taskiq import AsyncBroker, ScheduleSource, TaskiqScheduler, async_shared_broker
 from taskiq.middlewares import SmartRetryMiddleware
 from taskiq_aio_pika import AioPikaBroker, Exchange, Queue
 from taskiq_redis import ListRedisScheduleSource, RedisAsyncResultBackend
@@ -76,6 +77,34 @@ def setup_task_manager_middlewares(
             max_delay_exponent=taskiq_config.max_delay_exponent,
         ),
     )
+
+
+def setup_event_broker(rabbitmq_config: RabbitMQConfig) -> RabbitBroker:
+    """FastStream's connection, used by the relay to publish domain events.
+
+    Separate from taskiq's: taskiq owns a work queue whose messages are
+    consumed competitively, while domain events go to a topic exchange that any
+    number of consumers can bind to independently.
+
+    Only ever a publisher here — goldy subscribes to nothing — so it is created
+    and handed to the container rather than being given a FastStream app and a
+    lifespan of its own.
+    """
+    return RabbitBroker(url=rabbitmq_config.uri)
+
+
+def setup_scheduler(
+    broker: AsyncBroker,
+    schedule_source: ScheduleSource,
+) -> TaskiqScheduler:
+    """Builds the scheduler that fires the cron tasks.
+
+    Takes the worker's own broker rather than building one: a separately built
+    broker could drift in queue naming and then silently fire into a queue
+    nobody consumes. The scheduler only enqueues — the worker still does the
+    work.
+    """
+    return TaskiqScheduler(broker=broker, sources=[schedule_source])
 
 
 def setup_schedule_source(redis_config: RedisConfig) -> ScheduleSource:

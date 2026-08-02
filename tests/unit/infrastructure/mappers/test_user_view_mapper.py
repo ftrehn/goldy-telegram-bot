@@ -22,6 +22,7 @@ def test_every_value_object_is_unwrapped_to_a_primitive() -> None:
     assert view.role == "customer"
     assert view.status == "active"
     assert view.notify_via == "telegram"
+    assert view.locale == "ru"
     assert view.marketing_consent is False
     assert view.block_reason is None
 

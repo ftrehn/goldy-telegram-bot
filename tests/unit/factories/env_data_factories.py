@@ -42,6 +42,7 @@ def redis_env(**overrides: str) -> dict[str, str]:
         "REDIS_WORKER_DB": "1",
         "REDIS_SCHEDULE_SOURCE_DB": "2",
         "REDIS_CACHE_DB": "0",
+        "REDIS_FSM_DB": "3",
     } | overrides
 
 
@@ -54,6 +55,23 @@ def rabbitmq_env(**overrides: str) -> dict[str, str]:
         "RABBITMQ_PASSWORD": "guest",
         "RABBITMQ_VHOST": "/",
     } | overrides
+
+
+def telegram_env(**overrides: str) -> dict[str, str]:
+    """Valid ``TELEGRAM_*`` values; override any key."""
+    return {
+        "TELEGRAM_BOT_TOKEN": "123456789:AAFakeTokenForTestsOnly",
+        "TELEGRAM_USE_REDIS_STORAGE": "true",
+        "TELEGRAM_USE_REDIS_EVENT_ISOLATION": "true",
+        "TELEGRAM_USE_I18N_ISOLATION": "true",
+        "TELEGRAM_DEFAULT_LOCALE": "ru",
+        "TELEGRAM_DROP_PENDING_UPDATES": "true",
+    } | overrides
+
+
+def admin_env(**overrides: str) -> dict[str, str]:
+    """Valid ``GOLDY_ADMIN_*`` values; override any key."""
+    return {"GOLDY_ADMIN_PHONE_NUMBERS": ""} | overrides
 
 
 def taskiq_env(**overrides: str) -> dict[str, str]:

@@ -5,7 +5,13 @@ from dature import V, load
 from goldy.setup.bootstrap.loaders.loader import ConfigLoader
 from goldy.setup.configs.redis_config import RedisConfig
 
-from .consts import PORT_MAX, PORT_MIN, REDIS_DB_MAX, REDIS_DB_MIN
+from .consts import (
+    DISTINCT_REDIS_DATABASES,
+    PORT_MAX,
+    PORT_MIN,
+    REDIS_DB_MAX,
+    REDIS_DB_MIN,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -58,10 +64,19 @@ class RedisConfigLoader(ConfigLoader[RedisConfig]):
                 error_message=f"REDIS_CACHE_DB {db_range}",
             ),
             V.root(
-                lambda c: len({c.worker_db, c.schedule_source_db, c.cache_db}) == 3,  # ruff:ignore[magic-value-comparison]
+                lambda c: REDIS_DB_MIN <= c.fsm_db <= REDIS_DB_MAX,
+                error_message=f"REDIS_FSM_DB {db_range}",
+            ),
+            V.root(
+                lambda c: (
+                    len(
+                        {c.worker_db, c.schedule_source_db, c.cache_db, c.fsm_db},
+                    )
+                    == DISTINCT_REDIS_DATABASES
+                ),
                 error_message=(
-                    "REDIS_WORKER_DB, REDIS_SCHEDULE_SOURCE_DB and REDIS_CACHE_DB "
-                    "must be three different database indexes"
+                    "REDIS_WORKER_DB, REDIS_SCHEDULE_SOURCE_DB, REDIS_CACHE_DB and "
+                    "REDIS_FSM_DB must be four different database indexes"
                 ),
             ),
         )

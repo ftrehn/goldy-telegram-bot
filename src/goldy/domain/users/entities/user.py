@@ -24,6 +24,7 @@ from goldy.domain.users.events import (
     UserRoleChanged,
     UserUnblocked,
 )
+from goldy.domain.users.registration import Registration
 from goldy.domain.users.values.block_reason import BlockReason
 from goldy.domain.users.values.external_account_id import ExternalAccountId
 from goldy.domain.users.values.full_name import FullName
@@ -77,9 +78,7 @@ class User(Aggregate[UserId]):
         *,
         user_id: UserId,
         events_collection: EventsCollection,
-        phone_number: PhoneNumber,
-        full_name: FullName,
-        account: MessengerAccount,
+        registration: Registration,
     ) -> Self:
         """Creates a person together with the account they arrived from.
 
@@ -88,20 +87,25 @@ class User(Aggregate[UserId]):
         every later reader has to cope with it.
 
         Notifications default to the platform they came from — the only one we
-        know reaches them.
+        know reaches them — and the language to whatever that platform said the
+        person reads in.
         """
+        account = registration.account
         user = cls(
             id=user_id,
             events_collection=events_collection,
-            phone_number=phone_number,
-            full_name=full_name,
-            preferences=UserPreferences(notify_via=account.platform),
+            phone_number=registration.phone_number,
+            full_name=registration.full_name,
+            preferences=UserPreferences(
+                notify_via=account.platform,
+                locale=registration.locale,
+            ),
             accounts=[account],
         )
         user.events_collection.add_event(
             UserRegistered(
                 user_id=user_id,
-                phone_number=str(phone_number),
+                phone_number=str(registration.phone_number),
                 platform=account.platform.value,
                 external_id=str(account.external_id),
             ),
@@ -255,6 +259,7 @@ class User(Aggregate[UserId]):
             UserPreferencesChanged(
                 user_id=self.id,
                 notify_via=preferences.notify_via.value,
+                locale=preferences.locale.value,
                 marketing_consent=preferences.marketing_consent,
             ),
         )

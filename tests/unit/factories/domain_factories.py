@@ -10,9 +10,11 @@ from uuid import UUID
 from goldy.domain.common.events_collection import EventsCollection
 from goldy.domain.users.entities.messenger_account import MessengerAccount
 from goldy.domain.users.entities.user import User
+from goldy.domain.users.registration import Registration
 from goldy.domain.users.values.block_reason import BlockReason
 from goldy.domain.users.values.external_account_id import ExternalAccountId
 from goldy.domain.users.values.full_name import FullName
+from goldy.domain.users.values.locale import DEFAULT_LOCALE, Locale
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
 from goldy.domain.users.values.messenger_username import MessengerUsername
 from goldy.domain.users.values.phone_number import PhoneNumber
@@ -65,6 +67,23 @@ def make_account(
     )
 
 
+def make_locale(value: str = DEFAULT_LOCALE) -> Locale:
+    return Locale(value=value)
+
+
+def make_registration(
+    phone_number: str = CUSTOMER_PHONE,
+    account: MessengerAccount | None = None,
+    locale: str = DEFAULT_LOCALE,
+) -> Registration:
+    return Registration(
+        phone_number=make_phone_number(phone_number),
+        full_name=make_full_name(),
+        account=account if account is not None else make_account(),
+        locale=make_locale(locale),
+    )
+
+
 def make_registered_user(
     user_id: UserId | None = None,
     phone_number: str = CUSTOMER_PHONE,
@@ -83,9 +102,7 @@ def make_registered_user(
     user = User.register(
         user_id=user_id if user_id is not None else make_user_id(),
         events_collection=collection,
-        phone_number=make_phone_number(phone_number),
-        full_name=make_full_name(),
-        account=account if account is not None else make_account(),
+        registration=make_registration(phone_number=phone_number, account=account),
     )
 
     if role is not UserRole.CUSTOMER:

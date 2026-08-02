@@ -1,5 +1,8 @@
 """One stub source per config, serving valid values keyed by env var name."""
 
+from goldy.setup.bootstrap.sources.admin_env_source_factory import (
+    AdminEnvSourceFactory,
+)
 from goldy.setup.bootstrap.sources.alchemy_env_source_factory import (
     SQLAlchemyEnvSourceFactory,
 )
@@ -15,12 +18,17 @@ from goldy.setup.bootstrap.sources.redis_env_source_factory import (
 from goldy.setup.bootstrap.sources.taskiq_env_source_factory import (
     TaskIQEnvSourceFactory,
 )
+from goldy.setup.bootstrap.sources.telegram_env_source_factory import (
+    TelegramEnvSourceFactory,
+)
 from tests.unit.factories.env_data_factories import (
+    admin_env,
     postgres_env,
     rabbitmq_env,
     redis_env,
     sqlalchemy_env,
     taskiq_env,
+    telegram_env,
 )
 from tests.unit.factories.stub_source_factory import StubSourceFactory
 
@@ -59,4 +67,20 @@ def taskiq_source_stub(**overrides: str) -> StubSourceFactory:
     return StubSourceFactory.mirroring(
         TaskIQEnvSourceFactory(),
         taskiq_env(**overrides),
+    )
+
+
+def telegram_source_stub(**overrides: str) -> StubSourceFactory:
+    """In-memory stub serving valid ``TELEGRAM_*`` values; override any key."""
+    return StubSourceFactory.mirroring(
+        TelegramEnvSourceFactory(),
+        telegram_env(**overrides),
+    )
+
+
+def admin_source_stub(**overrides: str) -> StubSourceFactory:
+    """In-memory stub serving valid ``GOLDY_ADMIN_*`` values; override any key."""
+    return StubSourceFactory.mirroring(
+        AdminEnvSourceFactory(),
+        admin_env(**overrides),
     )

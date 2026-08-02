@@ -5,6 +5,7 @@ from sqlalchemy.engine import Dialect
 
 from goldy.domain.users.values.block_reason import BlockReason
 from goldy.domain.users.values.external_account_id import ExternalAccountId
+from goldy.domain.users.values.locale import Locale
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
 from goldy.domain.users.values.messenger_username import MessengerUsername
 from goldy.domain.users.values.phone_number import PhoneNumber
@@ -15,6 +16,7 @@ MAX_PHONE_NUMBER_COLUMN_LENGTH = 20
 MAX_EXTERNAL_ACCOUNT_ID_COLUMN_LENGTH = 64
 MAX_MESSENGER_USERNAME_COLUMN_LENGTH = 64
 MAX_ENUM_COLUMN_LENGTH = 20
+MAX_LOCALE_COLUMN_LENGTH = 8
 
 
 class PhoneNumberType(TypeDecorator[PhoneNumber]):
@@ -140,6 +142,34 @@ class MessengerPlatformType(TypeDecorator[MessengerPlatform]):
         dialect: Dialect,
     ) -> MessengerPlatform | None:
         return MessengerPlatform(value) if value is not None else None
+
+
+class LocaleType(TypeDecorator[Locale]):
+    """Persists the chosen language as its bare subtag.
+
+    Rebuilding through the constructor rather than ``from_language_code``: a
+    row holding a locale we no longer ship should fail loudly on load, not
+    quietly become Russian and hide that a translation went missing.
+    """
+
+    impl = String(MAX_LOCALE_COLUMN_LENGTH)
+    cache_ok = True
+
+    @override
+    def process_bind_param(
+        self,
+        value: Locale | None,
+        dialect: Dialect,
+    ) -> str | None:
+        return value.value if value is not None else None
+
+    @override
+    def process_result_value(
+        self,
+        value: str | None,
+        dialect: Dialect,
+    ) -> Locale | None:
+        return Locale(value=value) if value is not None else None
 
 
 class UserRoleType(TypeDecorator[UserRole]):

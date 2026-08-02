@@ -9,6 +9,7 @@ from goldy.domain.users.errors import (
     InvalidPhoneNumberFormatError,
     TooLongBlockReasonError,
     TooLongNamePartError,
+    UnsupportedLocaleError,
 )
 from goldy.domain.users.values.block_reason import (
     MAX_BLOCK_REASON_LENGTH,
@@ -16,6 +17,7 @@ from goldy.domain.users.values.block_reason import (
 )
 from goldy.domain.users.values.external_account_id import ExternalAccountId
 from goldy.domain.users.values.full_name import MAX_NAME_PART_LENGTH, FullName
+from goldy.domain.users.values.locale import Locale
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
 from goldy.domain.users.values.messenger_username import MessengerUsername
 from goldy.domain.users.values.phone_number import PhoneNumber
@@ -122,7 +124,9 @@ def test_value_objects_compare_by_value() -> None:
 
 
 def test_preferences_are_replaced_rather_than_mutated() -> None:
-    original = UserPreferences(notify_via=MessengerPlatform.TELEGRAM)
+    original = UserPreferences(
+        notify_via=MessengerPlatform.TELEGRAM, locale=Locale(value="ru")
+    )
 
     changed = original.with_notify_via(MessengerPlatform.MAX)
 
@@ -131,7 +135,50 @@ def test_preferences_are_replaced_rather_than_mutated() -> None:
     assert changed.marketing_consent is original.marketing_consent
 
 
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    (
+        ("ru", "ru"),
+        ("en", "en"),
+        ("en-GB", "en"),
+        ("pt_BR", "ru"),
+        ("de", "ru"),
+        (None, "ru"),
+        ("  RU  ", "ru"),
+    ),
+)
+def test_a_platform_language_code_falls_back_to_the_default(
+    raw: str | None,
+    expected: str,
+) -> None:
+    """A Brazilian pressing /start should get a working bot, not a refusal."""
+    assert Locale.from_language_code(raw).value == expected
+
+
+def test_a_locale_we_do_not_translate_is_refused_outright() -> None:
+    """The constructor is for values we chose ourselves — a bug, not user input."""
+    with pytest.raises(UnsupportedLocaleError):
+        Locale(value="de")
+
+
+def test_the_language_can_be_changed_without_touching_the_rest() -> None:
+    original = UserPreferences(
+        notify_via=MessengerPlatform.TELEGRAM,
+        locale=Locale(value="ru"),
+        marketing_consent=True,
+    )
+
+    changed = original.with_locale(Locale(value="en"))
+
+    assert changed.locale == Locale(value="en")
+    assert changed.notify_via is original.notify_via
+    assert changed.marketing_consent is True
+
+
 def test_marketing_consent_is_off_until_asked_for() -> None:
     assert (
-        UserPreferences(notify_via=MessengerPlatform.TELEGRAM).marketing_consent is False
+        UserPreferences(
+            notify_via=MessengerPlatform.TELEGRAM, locale=Locale(value="ru")
+        ).marketing_consent
+        is False
     )

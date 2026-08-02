@@ -23,5 +23,6 @@ class RedisEnvSourceFactory(SourceFactory):
                 F[RedisConfig].worker_db: "REDIS_WORKER_DB",
                 F[RedisConfig].schedule_source_db: "REDIS_SCHEDULE_SOURCE_DB",
                 F[RedisConfig].cache_db: "REDIS_CACHE_DB",
+                F[RedisConfig].fsm_db: "REDIS_FSM_DB",
             },
         )

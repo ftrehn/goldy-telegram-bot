@@ -12,9 +12,10 @@ class RedisConfig:
     mapping and validation live in
     ``answer_service.setup.bootstrap.loaders.redis_config_loader``.
 
-    Three logical databases on one server: results, schedules and cache are
-    unrelated data with different lifetimes, and separating them keeps a
-    ``FLUSHDB`` of one from taking the others with it.
+    Four logical databases on one server: results, schedules, cache and bot
+    dialogue state are unrelated data with different lifetimes, and separating
+    them keeps a ``FLUSHDB`` of one from taking the others with it. Wiping the
+    cache is routine; wiping it out from under everyone mid-dialogue is not.
 
     Attributes:
         host: Redis server hostname or IP address.
@@ -25,11 +26,13 @@ class RedisConfig:
         worker_db: Database index for the taskiq result backend.
         schedule_source_db: Database index for the taskiq schedule source.
         cache_db: Database index for the application cache.
+        fsm_db: Database index for the bot's FSM storage and event isolation.
 
     Properties:
         worker_uri: Connection URI for the result backend.
         schedule_source_uri: Connection URI for the schedule source.
         cache_uri: Connection URI for the application cache.
+        fsm_uri: Connection URI for the bot's dialogue state.
     """
 
     host: str
@@ -39,6 +42,7 @@ class RedisConfig:
     worker_db: int = 1
     schedule_source_db: int = 2
     cache_db: int = 0
+    fsm_db: int = 3
 
     @property
     def worker_uri(self) -> str:
@@ -54,6 +58,11 @@ class RedisConfig:
     def cache_uri(self) -> str:
         """URI of the database holding the application cache."""
         return self._uri(self.cache_db)
+
+    @property
+    def fsm_uri(self) -> str:
+        """URI of the database holding where each person is in a dialogue."""
+        return self._uri(self.fsm_db)
 
     def _uri(self, db: int) -> str:
         """Builds one database's URI.

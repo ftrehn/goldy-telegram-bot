@@ -20,6 +20,7 @@ from goldy.infrastructure.persistence.models.base import mapper_registry
 from goldy.infrastructure.persistence.models.types import (
     BlockReasonType,
     ExternalAccountIdType,
+    LocaleType,
     MessengerPlatformType,
     MessengerUsernameType,
     PhoneNumberType,
@@ -40,6 +41,7 @@ users_table: Final[Table] = Table(
     Column("status", UserStatusType, nullable=False, index=True),
     Column("block_reason", BlockReasonType, nullable=True),
     Column("notify_via", MessengerPlatformType, nullable=False),
+    Column("locale", LocaleType, nullable=False),
     Column("marketing_consent", Boolean, nullable=False),
     Column("created_at", DateTime(timezone=True), nullable=False, index=True),
     Column("updated_at", DateTime(timezone=True), nullable=False),
@@ -110,9 +112,13 @@ def map_users_table() -> None:
                 users_table.c.first_name,
                 users_table.c.last_name,
             ),
+            # Column order must match the dataclass field order — composites
+            # are rebuilt positionally, so swapping these two silently swaps
+            # the values.
             "preferences": composite(
                 UserPreferences,
                 users_table.c.notify_via,
+                users_table.c.locale,
                 users_table.c.marketing_consent,
             ),
             "role": users_table.c.role,

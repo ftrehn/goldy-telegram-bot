@@ -48,6 +48,7 @@ class UserPhoneNumberChanged(Event):
 class UserPreferencesChanged(Event):
     user_id: UUID
     notify_via: str
+    locale: str
     marketing_consent: bool
 
 

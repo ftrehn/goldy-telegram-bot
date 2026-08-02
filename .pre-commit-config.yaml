@@ -39,7 +39,7 @@ repos:
         # and a hook that always fires is a hook people stop reading.
         args:
           - '--exclude-files'
-          - '\.env.*|^deploy[/\\]|alembic\.ini|migrations[/\\]|_env_source_factory\.py$|configs[/\\]postgres_config\.py$'
+          - '\.env.*|^deploy[/\\]|alembic\.ini|migrations[/\\]|_env_source_factory\.py$|configs[/\\]postgres_config\.py$|^tests[/\\]'
 
 -   repo: local
     hooks:

@@ -68,6 +68,10 @@ def _notify_via_of(user: User) -> str:
     return user.preferences.notify_via.value
 
 
+def _locale_of(user: User) -> str:
+    return user.preferences.locale.value
+
+
 def _marketing_consent_of(user: User) -> bool:
     return user.preferences.marketing_consent
 
@@ -92,6 +96,7 @@ _convert_user: Final[Callable[[User], UserView]] = get_converter(
         link_function(_status_of, P[UserView].status),
         link_function(_block_reason_of, P[UserView].block_reason),
         link_function(_notify_via_of, P[UserView].notify_via),
+        link_function(_locale_of, P[UserView].locale),
         link_function(_marketing_consent_of, P[UserView].marketing_consent),
         link_function(_accounts_of, P[UserView].accounts),
     ],

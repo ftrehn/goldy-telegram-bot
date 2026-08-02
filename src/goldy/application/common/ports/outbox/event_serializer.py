@@ -1,8 +1,7 @@
 from abc import abstractmethod
 from typing import Protocol
 
-from application.common.ports.outbox.outbox_message import OutboxMessage
-
+from goldy.application.common.ports.outbox.outbox_message import OutboxMessage
 from goldy.domain.common.event import Event
 
 

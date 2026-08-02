@@ -12,7 +12,6 @@ from goldy.domain.users.errors import (
 from goldy.domain.users.values.external_account_id import ExternalAccountId
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
 from goldy.domain.users.values.messenger_username import MessengerUsername
-from goldy.domain.users.values.user_preferences import UserPreferences
 from goldy.domain.users.values.user_role import UserRole
 from goldy.domain.users.values.user_status import UserStatus
 from tests.unit.factories.domain_factories import (
@@ -142,7 +141,7 @@ def test_renaming_to_the_same_name_records_nothing() -> None:
 def test_notifications_cannot_be_pointed_at_an_unlinked_platform() -> None:
     user, _ = make_registered_user()
 
-    preferences = UserPreferences(notify_via=MessengerPlatform.MAX)
+    preferences = user.preferences.with_notify_via(MessengerPlatform.MAX)
 
     with pytest.raises(NotificationTargetNotLinkedError):
         user.change_preferences(preferences)
@@ -154,11 +153,24 @@ def test_changing_preferences_to_a_linked_platform_records_it() -> None:
     emitted_event_names(collection)
 
     user.change_preferences(
-        UserPreferences(notify_via=MessengerPlatform.MAX, marketing_consent=True),
+        user.preferences.with_notify_via(MessengerPlatform.MAX).with_marketing_consent(
+            consent=True,
+        ),
     )
 
     assert user.preferences.marketing_consent is True
     assert emitted_event_names(collection) == ["UserPreferencesChanged"]
+
+
+def test_changing_the_channel_leaves_the_language_alone() -> None:
+    """Derived preferences, not fresh ones — otherwise the language resets."""
+    user, _ = make_registered_user()
+    user.link_account(make_account(MessengerPlatform.MAX, MAX_ACCOUNT_ID))
+    original_locale = user.preferences.locale
+
+    user.change_preferences(user.preferences.with_notify_via(MessengerPlatform.MAX))
+
+    assert user.preferences.locale == original_locale
 
 
 def test_blocking_records_the_reason() -> None:

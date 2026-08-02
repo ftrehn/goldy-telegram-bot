@@ -9,17 +9,21 @@ dature's.
 import pytest
 from dature.errors.exceptions import DatureConfigError
 
+from goldy.setup.bootstrap.loaders.admin_config_loader import AdminConfigLoader
 from goldy.setup.bootstrap.loaders.alchemy_config_loader import SQLAlchemyConfigLoader
 from goldy.setup.bootstrap.loaders.postgres_config_loader import PostgresConfigLoader
 from goldy.setup.bootstrap.loaders.rabbitmq_config_loader import RabbitMQConfigLoader
 from goldy.setup.bootstrap.loaders.redis_config_loader import RedisConfigLoader
 from goldy.setup.bootstrap.loaders.taskiq_config_loader import TaskIQConfigLoader
+from goldy.setup.bootstrap.loaders.telegram_config_loader import TelegramConfigLoader
 from tests.unit.factories.source_stubs import (
+    admin_source_stub,
     postgres_source_stub,
     rabbitmq_source_stub,
     redis_source_stub,
     sqlalchemy_source_stub,
     taskiq_source_stub,
+    telegram_source_stub,
 )
 from tests.unit.support import render_exception
 
@@ -56,12 +60,13 @@ def test_postgres_password_is_masked_in_error_output() -> None:
 
 
 def test_redis_gives_each_purpose_its_own_database() -> None:
-    """Results and schedules must not share a database, or a flush takes both."""
+    """A cache flush must not take the dialogue state with it."""
     config = RedisConfigLoader(redis_source_stub()).load()
 
     assert config.worker_uri == "redis://localhost:6379/1"
     assert config.schedule_source_uri == "redis://localhost:6379/2"
     assert config.cache_uri == "redis://localhost:6379/0"
+    assert config.fsm_uri == "redis://localhost:6379/3"
 
 
 def test_redis_rejects_two_purposes_sharing_a_database() -> None:
@@ -195,6 +200,78 @@ def test_taskiq_rejects_a_dead_letter_queue_sharing_the_live_name() -> None:
         loader.load()
 
     assert "must differ" in render_exception(excinfo.value)
+
+
+def test_redis_rejects_the_fsm_database_colliding_with_the_cache() -> None:
+    """Sharing with the cache means a routine flush drops everyone mid-dialogue."""
+    loader = RedisConfigLoader(redis_source_stub(REDIS_FSM_DB="0"))
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "four different database indexes" in render_exception(excinfo.value)
+
+
+def test_telegram_loads_its_storage_flags() -> None:
+    config = TelegramConfigLoader(telegram_source_stub()).load()
+
+    assert config.use_redis_storage is True
+    assert config.use_redis_event_isolation is True
+    assert config.default_locale == "ru"
+
+
+@pytest.mark.parametrize("token", ("", "   ", "no-colon-here"))
+def test_telegram_rejects_a_token_that_is_not_shaped_like_one(token: str) -> None:
+    """Turns the commonest deployment mistake into a startup error, not a 401."""
+    loader = TelegramConfigLoader(telegram_source_stub(TELEGRAM_BOT_TOKEN=token))
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "TELEGRAM_BOT_TOKEN" in render_exception(excinfo.value)
+
+
+def test_telegram_bot_token_is_masked_in_error_output() -> None:
+    """A startup failure is a log, and the token is a credential."""
+    stub = telegram_source_stub(
+        TELEGRAM_BOT_TOKEN="123:TOP-SECRET-VALUE",
+        TELEGRAM_DEFAULT_LOCALE="de",
+    )
+
+    loader = TelegramConfigLoader(stub)
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "TOP-SECRET-VALUE" not in render_exception(excinfo.value)
+
+
+def test_telegram_rejects_a_default_locale_we_do_not_ship() -> None:
+    loader = TelegramConfigLoader(telegram_source_stub(TELEGRAM_DEFAULT_LOCALE="de"))
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "TELEGRAM_DEFAULT_LOCALE" in render_exception(excinfo.value)
+
+
+def test_no_configured_admins_is_a_valid_configuration() -> None:
+    """A fresh deployment has none, and that must not stop the bot booting."""
+    config = AdminConfigLoader(admin_source_stub()).load()
+
+    assert not config.phone_numbers
+
+
+def test_admin_numbers_are_rejected_when_one_of_them_is_nonsense() -> None:
+    """A typo here means an administrator silently never gets their role."""
+    stub = admin_source_stub(GOLDY_ADMIN_PHONE_NUMBERS="+79991234567,not-a-number")
+
+    loader = AdminConfigLoader(stub)
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "GOLDY_ADMIN_PHONE_NUMBERS" in render_exception(excinfo.value)
 
 
 def test_sqlalchemy_optional_fields_fall_back_to_their_defaults() -> None:

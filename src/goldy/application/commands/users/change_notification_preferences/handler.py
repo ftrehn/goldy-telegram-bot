@@ -15,7 +15,6 @@ from goldy.domain.users.services.authorization.permission import (
     UserManagementContext,
 )
 from goldy.domain.users.values.user_id import UserId
-from goldy.domain.users.values.user_preferences import UserPreferences
 
 
 class ChangeNotificationPreferencesHandler(
@@ -46,10 +45,12 @@ class ChangeNotificationPreferencesHandler(
             context=UserManagementContext(subject=subject, target=target),
         )
 
+        # Derived from what they already have rather than built fresh: a new
+        # ``UserPreferences`` would reset the language every time somebody
+        # touched their notification channel.
         target.change_preferences(
-            UserPreferences(
-                notify_via=command.notify_via,
-                marketing_consent=command.marketing_consent,
+            target.preferences.with_notify_via(command.notify_via).with_marketing_consent(
+                consent=command.marketing_consent,
             ),
         )
         return self._user_view_mapper.to_view(target)

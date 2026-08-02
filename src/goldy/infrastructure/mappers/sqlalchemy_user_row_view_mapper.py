@@ -38,6 +38,7 @@ class SqlAlchemyUserRowViewMapper(UserRowViewMapper):
             status=row["status"].value,
             block_reason=block_reason.value if block_reason is not None else None,
             notify_via=row["notify_via"].value,
+            locale=row["locale"].value,
             marketing_consent=row["marketing_consent"],
             accounts=tuple(accounts),
             created_at=row["created_at"],

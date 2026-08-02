@@ -10,6 +10,8 @@ POOL_OVERFLOW_MIN: Final[int] = 0
 
 REDIS_DB_MIN: Final[int] = 0
 REDIS_DB_MAX: Final[int] = 15
+DISTINCT_REDIS_DATABASES: Final[int] = 4
+"""Results, schedules, cache and bot dialogue state must not share an index."""
 
 RETRY_COUNT_MIN: Final[int] = 0
 DELAY_MIN: Final[float] = 0.0

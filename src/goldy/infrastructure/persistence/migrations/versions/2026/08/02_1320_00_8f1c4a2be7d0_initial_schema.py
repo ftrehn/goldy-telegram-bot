@@ -50,6 +50,7 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=20), nullable=False),
         sa.Column("block_reason", sa.Text(), nullable=True),
         sa.Column("notify_via", sa.String(length=20), nullable=False),
+        sa.Column("locale", sa.String(length=8), nullable=False),
         sa.Column("marketing_consent", sa.Boolean(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),

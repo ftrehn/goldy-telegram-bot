@@ -9,10 +9,10 @@ build-backend = "hatchling.build"
 source = "vcs"
 
 [tool.hatch.build.hooks.vcs]
-version-file = "src/telegramus/_version.py"
+version-file = "src/goldy/_version.py"
 
 [project]
-name = "telegramus"
+name = "goldy"
 dynamic = ["version"]
 description = "Service "
 readme = "README.md"

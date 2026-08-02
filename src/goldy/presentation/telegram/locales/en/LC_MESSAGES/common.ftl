@@ -12,3 +12,35 @@ error-unknown = Something went wrong. We are looking into it.
 
 start-welcome = Hello, { $name }! You are registered.
 start-welcome-back = Welcome back, { $name }!
+
+help-customer =
+    <b>What I can do</b>
+
+    /me — my profile
+    /help — this help
+help-staff =
+    <b>What I can do</b>
+
+    /me — my profile
+    /help — this help
+
+    <b>For staff</b>
+    /admin — manage users
+
+me-profile =
+    <b>{ $name }</b>
+
+    Phone: { $phone }
+    Role: { $role ->
+        [manager] manager
+        [admin] administrator
+       *[customer] customer
+    }
+    Language: { $locale ->
+        [ru] Русский
+       *[en] English
+    }
+    Notifications: { $notify }
+
+unknown-command = I do not understand. Send /help to see what I can do.
+cancelled = Cancelled. Send /help if you need a reminder.

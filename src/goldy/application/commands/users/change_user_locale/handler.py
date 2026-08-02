@@ -41,9 +41,6 @@ class ChangeUserLocaleHandler(CommandHandler[ChangeUserLocaleCommand, UserView])
             context=UserManagementContext(subject=subject, target=target),
         )
 
-        # The constructor, not ``from_language_code``: this came from a button
-        # the bot itself drew, so an unsupported value is a bug on our side and
-        # should be loud rather than silently falling back to Russian.
         target.change_preferences(
             target.preferences.with_locale(Locale(value=command.locale)),
         )

@@ -11,15 +11,16 @@ from goldy.application.commands.users.register_user.command import RegisterUserC
 from goldy.application.common.mediator.sender import Sender
 from goldy.application.common.views.user import UserView
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
+from goldy.presentation.telegram.common import text_keys
+from goldy.presentation.telegram.common.keyboards import (
+    remove_keyboard,
+    share_phone_keyboard,
+)
 from goldy.presentation.telegram.errors import (
     ContactBelongsToSomeoneElseError,
     ContactHasNoPhoneNumberError,
 )
 from goldy.presentation.telegram.filters.chat import ChatTypeFilter
-from goldy.presentation.telegram.keyboards import (
-    remove_keyboard,
-    share_phone_keyboard,
-)
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -41,14 +42,16 @@ async def handle_start(
     """
     if user is not None:
         await message.answer(
-            i18n.get("start-welcome-back", name=user.first_name),
+            i18n.get(text_keys.START_WELCOME_BACK, name=user.first_name),
             reply_markup=remove_keyboard(),
         )
         return
 
     await message.answer(
-        i18n.get("auth-registration-required"),
-        reply_markup=share_phone_keyboard(i18n.get("auth-share-phone-button")),
+        i18n.get(text_keys.AUTH_REGISTRATION_REQUIRED),
+        reply_markup=share_phone_keyboard(
+            i18n.get(text_keys.AUTH_SHARE_PHONE_BUTTON),
+        ),
     )
 
 
@@ -98,6 +101,6 @@ async def handle_shared_contact(
     )
 
     await message.answer(
-        i18n.get("start-welcome", name=view.first_name),
+        i18n.get(text_keys.START_WELCOME, name=view.first_name),
         reply_markup=remove_keyboard(),
     )

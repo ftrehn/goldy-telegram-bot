@@ -102,9 +102,6 @@ class RegisterUserHandler(CommandHandler[RegisterUserCommand, UserView]):
                 locale=Locale.from_language_code(command.language_code),
             ),
         )
-        # Checked here as well as at startup: a number added to the list while
-        # its owner had not registered yet would otherwise wait for a restart,
-        # and an administrator who has to wait for one looks like a bug.
         if self._admin_registry.is_admin(phone_number):
             user.assign_role(UserRole.ADMIN)
             logger.info("register_user: %s is a configured admin", user.id)

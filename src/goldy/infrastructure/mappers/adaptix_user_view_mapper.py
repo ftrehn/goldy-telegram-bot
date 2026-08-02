@@ -1,3 +1,12 @@
+"""Converters from the aggregate to its view, built once at import time.
+
+Almost every field goes through a ``link_function`` because adaptix links
+fields, not paths: ``P[User].full_name.first_name`` is rejected, so each value
+object has to be unwrapped by a function of its own. ``id`` needs one too —
+``UserId`` is a ``NewType``, which adaptix does not see through. Only the
+timestamps line up unaided.
+"""
+
 from collections.abc import Callable
 from typing import Final, final, override
 from uuid import UUID
@@ -84,10 +93,6 @@ _convert_user: Final[Callable[[User], UserView]] = get_converter(
     User,
     UserView,
     recipe=[
-        # adaptix links fields, not paths: ``P[User].full_name.first_name`` is
-        # rejected, so every value object that has to be unwrapped gets its own
-        # function. ``id`` needs one too — ``UserId`` is a ``NewType``, which
-        # adaptix does not see through. Only the timestamps line up unaided.
         link_function(_id_of, P[UserView].id),
         link_function(_phone_number_of, P[UserView].phone_number),
         link_function(_first_name_of, P[UserView].first_name),

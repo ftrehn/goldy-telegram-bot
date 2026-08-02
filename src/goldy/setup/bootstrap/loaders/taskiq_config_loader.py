@@ -59,9 +59,6 @@ class TaskIQConfigLoader(ConfigLoader[TaskIQConfig]):
                     f"stops the worker consuming anything at all"
                 ),
             ),
-            # Sharing a name would bind the dead-letter queue to the same
-            # routing key as the live one, so a poisoned message would be
-            # redelivered to the workers that already rejected it.
             V.root(
                 lambda c: c.queue_name != c.dead_letter_queue_name,
                 error_message=(

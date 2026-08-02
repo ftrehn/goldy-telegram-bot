@@ -23,9 +23,6 @@ def task_manager_provider() -> Provider:
     provider: Final[Provider] = Provider(scope=Scope.REQUEST)
     provider.from_context(provides=AsyncBroker, scope=Scope.APP)
     provider.from_context(provides=ScheduleSource, scope=Scope.APP)
-    # FastStream's own connection, not taskiq's: the relay publishes domain
-    # events to a topic exchange consumers bind to, which is a different thing
-    # from the work queue taskiq owns.
     provider.from_context(provides=RabbitBroker, scope=Scope.APP)
     provider.provide(source=TaskIQTaskScheduler, provides=TaskScheduler)
     provider.provide(source=FastStreamOutboxPublisher, provides=OutboxPublisher)

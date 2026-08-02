@@ -1,3 +1,12 @@
+"""Handler providers, grouped by what a handler needs rather than who calls it.
+
+Everything past the bootstrap group wants to know who is acting, and a process
+with no concept of "who" — a taskiq worker — must not be able to build it.
+dishka validates the whole graph when a container is made, so the split turns
+"this handler cannot run here" into a refusal at startup instead of a failure
+halfway through a background task.
+"""
+
 from typing import Final
 
 from dishka import Provider, Scope
@@ -25,12 +34,6 @@ from goldy.application.queries.users.get_current_user.handler import (
 )
 from goldy.application.queries.users.get_user_by_id.handler import GetUserByIdHandler
 from goldy.application.queries.users.list_users.handler import ListUsersHandler
-
-# Handlers are grouped by what they need, not by who calls them. Everything
-# below the first group wants to know who is acting, and a process with no
-# concept of "who" — a taskiq worker — must not be able to build it. dishka
-# validates the whole graph when the container is made, so the split turns
-# "this handler cannot run here" into a refusal at startup.
 
 
 def bootstrap_handlers_provider() -> Provider:

@@ -133,6 +133,12 @@ class SqlAlchemyUserQueryGateway(UserQueryGateway):
         return {user_id: tuple(views) for user_id, views in grouped.items()}
 
     def _conditions(self, filters: UserFilters) -> list[ColumnElement[bool]]:
+        """Builds the WHERE clauses for the admin list.
+
+        The phone number is cast to text before matching: its column carries a
+        ``PhoneNumber``, so a bare search string would be handed to the type
+        decorator as though it were one.
+        """
         conditions: list[ColumnElement[bool]] = []
 
         if filters.role is not None:
@@ -147,9 +153,6 @@ class SqlAlchemyUserQueryGateway(UserQueryGateway):
                 or_(
                     users_table.c.first_name.ilike(pattern),
                     users_table.c.last_name.ilike(pattern),
-                    # Cast because the column carries a ``PhoneNumber``: binding
-                    # a bare search string would be handed to the type decorator
-                    # as if it were one.
                     cast(users_table.c.phone_number, String).ilike(pattern),
                 ),
             )

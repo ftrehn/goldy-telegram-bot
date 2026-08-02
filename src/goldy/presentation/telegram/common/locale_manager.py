@@ -19,23 +19,29 @@ class UserLocaleManager(BaseManager):
     yet — and they are precisely the people who most need a comprehensible
     first message.
 
-    Reads the user out of middleware data rather than the database: the auth
-    middleware already loaded them for this update, and looking them up twice
-    to pick a language would double the cost of every message.
+    Both values come out of the middleware data rather than the database:
+    ``user`` was loaded by the auth gate for this very update, and
+    ``event_from_user`` is filled in by aiogram's own context middleware for
+    every shape of update there is. Querying again just to pick a language
+    would double the cost of every message.
+
+    Takes ``**kwargs`` because that is the contract — aiogram-i18n calls this
+    with whatever the update happened to put in the data, and which keys are
+    present depends on the kind of update.
     """
 
     @override
-    async def get_locale(
-        self,
-        user: UserView | None = None,
-        event_from_user: TelegramUser | None = None,
-    ) -> str:
+    async def get_locale(self, **kwargs: Any) -> str:
+        user: UserView | None = kwargs.get("user")
+
         if user is not None:
             return user.locale
 
+        event_from_user: TelegramUser | None = kwargs.get("event_from_user")
         language_code = (
             event_from_user.language_code if event_from_user is not None else None
         )
+
         return Locale.from_language_code(language_code).value
 
     @override

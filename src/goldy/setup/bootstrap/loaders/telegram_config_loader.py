@@ -32,11 +32,6 @@ class TelegramConfigLoader(ConfigLoader[TelegramConfig]):
     @staticmethod
     def _root_validators() -> Iterable[RootPredicate]:
         return (
-            # Shape only, not validity — a token that looks right but was
-            # revoked can only be found out by asking Telegram. Catching the
-            # empty and obviously-malformed cases here still turns the
-            # commonest deployment mistake into a readable startup error
-            # instead of a 401 from getUpdates.
             V.root(
                 lambda c: ":" in c.bot_token.strip(),
                 error_message=("TELEGRAM_BOT_TOKEN must look like '<bot_id>:<secret>'"),

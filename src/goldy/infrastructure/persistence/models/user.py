@@ -89,6 +89,11 @@ def map_users_table() -> None:
     ``events_collection`` is intentionally absent — it is not a column, so
     SQLAlchemy leaves it unset on loaded instances and the gateway supplies the
     request-scoped one.
+
+    Composite column order must match the dataclass field order. Composites are
+    rebuilt positionally, so reordering the columns of ``full_name`` or
+    ``preferences`` swaps the values silently, with nothing failing until
+    somebody reads a profile.
     """
     mapper_registry.map_imperatively(
         MessengerAccount,
@@ -112,9 +117,6 @@ def map_users_table() -> None:
                 users_table.c.first_name,
                 users_table.c.last_name,
             ),
-            # Column order must match the dataclass field order — composites
-            # are rebuilt positionally, so swapping these two silently swaps
-            # the values.
             "preferences": composite(
                 UserPreferences,
                 users_table.c.notify_via,

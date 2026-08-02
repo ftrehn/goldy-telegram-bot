@@ -2,10 +2,13 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any, Final, final, override
 
-from aiogram import Bot, BaseMiddleware
+from aiogram import BaseMiddleware, Bot
 from aiogram.filters import CommandStart
-from aiogram.types import TelegramObject, Update
-from aiogram.types import User as TelegramUser
+from aiogram.types import (
+    TelegramObject,
+    Update,
+    User as TelegramUser,
+)
 from aiogram_i18n.cores import BaseCore
 from dishka import AsyncContainer
 
@@ -13,9 +16,11 @@ from goldy.application.common.ports.identity_provider import IdentityProvider
 from goldy.application.common.ports.users import UserQueryGateway
 from goldy.application.common.views.user import UserView
 from goldy.application.error import AuthenticationError
+from goldy.domain.common.error import AppError
 from goldy.domain.users.values.locale import Locale
-from goldy.presentation.telegram.keyboards import share_phone_keyboard
-from goldy.presentation.telegram.replying import answer_update
+from goldy.presentation.telegram.common import text_keys
+from goldy.presentation.telegram.common.keyboards import share_phone_keyboard
+from goldy.presentation.telegram.common.replying import answer_update
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -51,9 +56,12 @@ class AuthMiddleware(BaseMiddleware):
     session, and the read side is the natural place for a cache when the second
     lookup starts to matter.
 
-    Renders its one message straight from the Fluent core rather than through
+    Renders its messages straight from the Fluent core rather than through
     ``I18nContext``: this runs before the i18n middleware, because that one
-    needs the user this one loads in order to pick the right language.
+    needs the user this one loads in order to pick the right language. For the
+    same reason it handles its own failures — an ``AppError`` raised while
+    loading the user would otherwise reach an error handler that has no context
+    to render with, and the person would get nothing at all.
     """
 
     def __init__(self, core: BaseCore[Any]) -> None:
@@ -66,28 +74,36 @@ class AuthMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
-        # Registered on ``dp.update``, so this is the only shape that arrives.
         if not isinstance(event, Update):
             return await handler(event, data)
 
-        container: AsyncContainer = data["dishka_container"]
-        user = await self._load_user(container)
-        data[USER_KEY] = user
-
-        # Filled in by aiogram's own context middleware, whichever kind of
-        # update this is — which beats digging the sender out of the payload.
         event_from_user: TelegramUser | None = data.get("event_from_user")
         locale = Locale.from_language_code(
             event_from_user.language_code if event_from_user is not None else None,
         )
 
+        container: AsyncContainer = data["dishka_container"]
+
+        try:
+            user = await self._load_user(container)
+        except AppError:
+            logger.exception("auth: could not load the user")
+            await self._refuse(event, locale, key=text_keys.ERROR_UNKNOWN)
+            return None
+
+        data[USER_KEY] = user
+
         if user is not None and user.is_blocked:
             logger.info("auth: refused blocked user %s", user.id)
-            await self._refuse(event, locale, key="error-blocked")
+            await self._refuse(event, locale, key=text_keys.ERROR_BLOCKED)
             return None
 
         if user is None and not await _is_registration_step(event, data["bot"]):
-            await self._refuse(event, locale, key="auth-registration-required")
+            await self._refuse(
+                event,
+                locale,
+                key=text_keys.AUTH_REGISTRATION_REQUIRED,
+            )
             return None
 
         return await handler(event, data)
@@ -109,7 +125,7 @@ class AuthMiddleware(BaseMiddleware):
             update,
             self._core.get(key, locale.value),
             reply_markup=share_phone_keyboard(
-                self._core.get("auth-share-phone-button", locale.value),
+                self._core.get(text_keys.AUTH_SHARE_PHONE_BUTTON, locale.value),
             ),
         )
 

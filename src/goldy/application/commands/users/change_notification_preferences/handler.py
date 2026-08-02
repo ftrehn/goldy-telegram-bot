@@ -45,9 +45,6 @@ class ChangeNotificationPreferencesHandler(
             context=UserManagementContext(subject=subject, target=target),
         )
 
-        # Derived from what they already have rather than built fresh: a new
-        # ``UserPreferences`` would reset the language every time somebody
-        # touched their notification channel.
         target.change_preferences(
             target.preferences.with_notify_via(command.notify_via).with_marketing_consent(
                 consent=command.marketing_consent,

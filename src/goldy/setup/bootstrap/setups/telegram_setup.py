@@ -9,9 +9,9 @@ from aiogram_dialog import setup_dialogs
 from aiogram_i18n import I18nMiddleware
 from aiogram_i18n.cores import BaseCore, FluentRuntimeCore
 
+from goldy.presentation.telegram.common.locale_manager import UserLocaleManager
+from goldy.presentation.telegram.common.locales_path import LOCALES_PATH
 from goldy.presentation.telegram.handlers import setup_all_dialogs, setup_all_handlers
-from goldy.presentation.telegram.locale_manager import UserLocaleManager
-from goldy.presentation.telegram.locales_path import LOCALES_PATH
 from goldy.presentation.telegram.middlewares.auth_middleware import AuthMiddleware
 from goldy.presentation.telegram.middlewares.timing_middleware import TimingMiddleware
 from goldy.setup.configs.redis_config import RedisConfig

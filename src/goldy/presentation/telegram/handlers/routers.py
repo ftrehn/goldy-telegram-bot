@@ -2,16 +2,27 @@ from typing import Final
 
 from aiogram import Dispatcher, Router
 
-from goldy.presentation.telegram.handlers import errors
-from goldy.presentation.telegram.handlers.start import handler as start
+from goldy.presentation.telegram.handlers.common.fallback import (
+    router as fallback_router,
+)
+from goldy.presentation.telegram.handlers.common.help import router as help_router
+from goldy.presentation.telegram.handlers.common.me import router as me_router
+from goldy.presentation.telegram.handlers.errors import router as errors_router
+from goldy.presentation.telegram.handlers.start.handler import router as start_router
 
 ROUTERS: Final[tuple[Router, ...]] = (
-    start.router,
-    # Last on purpose: an error router included earlier would still work, but
-    # keeping it at the end says plainly that it is the fallback and not a
-    # participant in normal routing.
-    errors.router,
+    start_router,
+    help_router,
+    me_router,
+    fallback_router,
+    errors_router,
 )
+"""Every router, in the order aiogram tries them.
+
+Order is load-bearing at the end. ``fallback_router`` matches everything, so
+anything below it would never run; ``errors_router`` observes failures rather
+than messages, and sits last to say so.
+"""
 
 
 def setup_all_handlers(dp: Dispatcher) -> None:

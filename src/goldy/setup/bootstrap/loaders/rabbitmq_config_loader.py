@@ -50,9 +50,6 @@ class RabbitMQConfigLoader(ConfigLoader[RabbitMQConfig]):
                     "virtual host"
                 ),
             ),
-            # A blank username would be sent as an empty SASL identity and the
-            # server would refuse the connection with a bare "access refused",
-            # which is a miserable thing to debug at startup.
             V.root(
                 lambda c: bool(c.user),
                 error_message="RABBITMQ_USER must not be empty",

@@ -31,7 +31,12 @@ logger: Final[logging.Logger] = logging.getLogger(__name__)
 
 
 async def create_bot() -> None:
-    """Builds every part of the bot, in the order their dependencies allow."""
+    """Builds every part of the bot, in the order their dependencies allow.
+
+    dishka is wired to the dispatcher before our own middlewares are
+    registered. Middlewares run in registration order, and authentication needs
+    the container dishka's own middleware puts into the update data.
+    """
     configure_logging(LoggingConfig())
 
     configs = load_shared_configs()
@@ -56,9 +61,6 @@ async def create_bot() -> None:
         make_telegram_container_context(configs, telegram_config, bot),
     )
 
-    # Before our own middlewares, so authentication has a container to resolve
-    # the gateway from — dishka registers an outer middleware of its own, and
-    # middlewares run in registration order.
     setup_dishka(container=container, router=dp, auto_inject=True)
 
     setup_telegram_bot_middlewares(

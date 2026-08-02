@@ -38,6 +38,7 @@ dependencies = [
     "adaptix==3.0.0b12",
     "aiogram==3.30.0",
     "aiogram-dialog==2.6.0",
+    "alembic>=1.18.5",
     "asyncpg>=0.31.0",
     "dature==1.1.0",
     "dishka==1.10.1",

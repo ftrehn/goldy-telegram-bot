@@ -28,7 +28,18 @@ repos:
     rev: v1.5.0
     hooks:
     -   id: detect-secrets
-        args: ['--exclude-files', '\.env.*|^deploy/|alembic\.ini|migrations/']
+        # Separators are matched both ways: on Windows the scanner reports
+        # backslash paths, so a `migrations/` exclusion silently misses every
+        # migration and flags each revision hash as a high-entropy secret.
+        #
+        # The config modules are excluded because they name where secrets come
+        # from and never hold one: the env source factories map fields to
+        # variable names like POSTGRES_PASSWORD, and postgres_config documents
+        # the shape of the URI it builds. Both trip the scanner on every run,
+        # and a hook that always fires is a hook people stop reading.
+        args:
+          - '--exclude-files'
+          - '\.env.*|^deploy[/\\]|alembic\.ini|migrations[/\\]|_env_source_factory\.py$|configs[/\\]postgres_config\.py$'
 
 -   repo: local
     hooks:

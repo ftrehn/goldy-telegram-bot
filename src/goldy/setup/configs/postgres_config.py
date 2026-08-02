@@ -35,8 +35,8 @@ class PostgresConfig:
         """Generates a PostgreSQL connection URI.
 
         Returns:
-            str: Connection string in format:
-                postgresql+driver://user:password@host:port/db_name
+            Connection string built from the configured driver, shaped like
+            ``postgresql+driver://user:password@host:port/db_name``.
 
         Note:
             - Uses the configured driver for async operations.

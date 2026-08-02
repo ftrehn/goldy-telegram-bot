@@ -56,3 +56,30 @@ profile-rename-prompt = Send your new name. A surname after a space is fine.
 profile-locale-prompt = Pick a language.
 profile-notifications-prompt = Notifications currently go to { $notify }. Where to?
 profile-accounts-prompt = Which messenger should I unlink?
+
+admin-users-title = <b>Users</b> — page { $page } of { $pages }, { $total } in total
+admin-empty = Nobody here yet.
+admin-user-card =
+    <b>{ $name }</b>
+
+    Phone: { $phone }
+    Role: { $role ->
+        [manager] manager
+        [admin] administrator
+       *[customer] customer
+    }
+    Status: { $status ->
+        [blocked] blocked
+       *[active] active
+    }
+    Language: { $locale }
+    Block reason: { $reason }
+admin-block-button = Block
+admin-unblock-button = Unblock
+admin-role-button = Change role
+admin-back-button = Back
+admin-close-button = Close
+admin-prev-button = ← Previous
+admin-next-button = Next →
+admin-block-reason-prompt = Send the reason. Whoever lifts the block will read it.
+admin-role-prompt = Pick a role. Administrator cannot be granted through the bot.

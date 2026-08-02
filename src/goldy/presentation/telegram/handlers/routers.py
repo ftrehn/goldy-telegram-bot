@@ -1,8 +1,13 @@
+from collections.abc import Iterable
 from typing import Final
 
 from aiogram import Dispatcher, Router
 from aiogram_dialog import Dialog
 
+from goldy.presentation.telegram.handlers.admin import (
+    ADMIN_DIALOG,
+    router as admin_router,
+)
 from goldy.presentation.telegram.handlers.common.fallback import (
     router as fallback_router,
 )
@@ -14,10 +19,11 @@ from goldy.presentation.telegram.handlers.profile import (
 )
 from goldy.presentation.telegram.handlers.start.handler import router as start_router
 
-ROUTERS: Final[tuple[Router, ...]] = (
+ROUTERS: Final[Iterable[Router]] = (
     start_router,
     help_router,
     profile_router,
+    admin_router,
     fallback_router,
     errors_router,
 )
@@ -28,7 +34,7 @@ anything below it would never run; ``errors_router`` observes failures rather
 than messages, and sits last to say so.
 """
 
-DIALOGS: Final[tuple[Dialog, ...]] = (PROFILE_DIALOG,)
+DIALOGS: Final[Iterable[Dialog]] = (PROFILE_DIALOG, ADMIN_DIALOG)
 """Dialogs, which are routers too — aiogram-dialog builds them as such."""
 
 

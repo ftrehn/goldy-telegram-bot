@@ -56,3 +56,30 @@ profile-rename-prompt = Отправьте новое имя. Можно с фа
 profile-locale-prompt = Выберите язык.
 profile-notifications-prompt = Сейчас уведомления приходят в { $notify }. Куда слать?
 profile-accounts-prompt = Какой мессенджер отвязать?
+
+admin-users-title = <b>Пользователи</b> — страница { $page } из { $pages }, всего { $total }
+admin-empty = Пока никого нет.
+admin-user-card =
+    <b>{ $name }</b>
+
+    Телефон: { $phone }
+    Роль: { $role ->
+        [manager] менеджер
+        [admin] администратор
+       *[customer] покупатель
+    }
+    Статус: { $status ->
+        [blocked] заблокирован
+       *[active] активен
+    }
+    Язык: { $locale }
+    Причина блокировки: { $reason }
+admin-block-button = Заблокировать
+admin-unblock-button = Разблокировать
+admin-role-button = Изменить роль
+admin-back-button = Назад
+admin-close-button = Закрыть
+admin-prev-button = ← Назад
+admin-next-button = Вперёд →
+admin-block-reason-prompt = Отправьте причину блокировки. Её увидит тот, кто будет разблокировать.
+admin-role-prompt = Выберите роль. Администратора через бота выдать нельзя.

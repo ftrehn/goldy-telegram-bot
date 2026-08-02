@@ -23,14 +23,14 @@ _retort: Final[Retort] = Retort(
 class RetortEventSerializer(EventSerializer):
     """Renders domain events as JSON outbox rows via adaptix.
 
-    Stamps the event with its identity and timestamp first: both setters are
-    write-once, so re-serializing an already-stamped event keeps the original
-    values and the payload stays byte-identical.
+    The outbox row reuses the event's own identity and timestamp rather than
+    minting new ones, so re-serializing the same event yields the same row:
+    the relay's at-least-once delivery then cannot turn one domain fact into
+    two messages that consumers see as unrelated.
     """
 
     @override
     def serialize(self, event: Event) -> OutboxMessage:
-
         return OutboxMessage(
             id=event.event_id,
             event_type=event.event_type,

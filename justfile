@@ -64,7 +64,7 @@ static-analysis: mypy bandit semgrep import-linter
 [doc("Run pytest with coverage")]
 [group("tests")]
 test:
-  uv run --active --frozen pytest --cov=src/answer_service --cov-report=term-missing
+  uv run --active --frozen pytest --cov=src/goldy --cov-report=term-missing
 
 [doc("Unit tests only (no Docker required)")]
 [group("tests")]
@@ -80,7 +80,7 @@ test-integration *params:
 [doc("Run the full suite the way CI does")]
 [group("tests")]
 test-ci:
-  uv run --active --frozen pytest --cov=src/answer_service --cov-report=xml --cov-report=term-missing --junitxml=junit.xml
+  uv run --active --frozen pytest --cov=src/goldy --cov-report=xml --cov-report=term-missing --junitxml=junit.xml
 
 [doc("Everything CI runs, in CI's order")]
 [group("tests")]

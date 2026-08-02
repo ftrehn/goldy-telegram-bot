@@ -1,5 +1,6 @@
 from goldy.infrastructure.persistence.models import (
     map_outbox_table,
+    map_users_table,
 )
 
 
@@ -28,3 +29,4 @@ def setup_map_tables() -> None:
     process of its own.
     """
     map_outbox_table()
+    map_users_table()

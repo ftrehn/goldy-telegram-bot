@@ -1,0 +1,100 @@
+# Configuration file example:  https://docs.astral.sh/ruff/configuration/
+# All settings:                https://docs.astral.sh/ruff/settings/
+
+fix = true
+preview = true
+
+line-length = 90
+indent-width = 4
+
+target-version = "py314"
+
+include = [
+    "src/telegramus/**/*.py",
+    "tests/**/*.py",
+    "pyproject.toml",
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = false
+
+[lint]
+select = [
+    "ALL",
+]
+
+ignore = [
+    "ANN401",
+
+    # dishka (DI) and pydantic (payloads/DTOs) resolve type hints at runtime, so
+    # types used in constructor / model-field annotations must stay importable at
+    # runtime rather than being pushed into a TYPE_CHECKING block.
+    "TC001",
+    "TC002",
+    "TC003",
+
+    # Assign error message to variable
+    "EM101",
+    "EM102",
+
+    # # preview
+    "CPY",
+    "PLR6301",
+
+    "D100",     # missing docstring in public module
+    "D101",
+    "D102",
+    "D103",
+    "D104",     # missing docstring in public package
+    "D105",     # missing docstring in magic methods
+    "D106",     # missing docstring in public nested class
+    "D107",     # missing docstring in __init__
+    "DOC201",
+    "DOC202",
+    "DOC402",
+    "DOC501",
+    "DOC502",
+
+    "COM812", # disable with format
+]
+
+[lint.per-file-ignores]
+# Alembic generates migration filenames with timestamps (e.g. 14_1957_52_...) that start
+# with digits — these are not valid Python identifiers but cannot be renamed.
+# Version subdirs (2026/, 03/) are not Python packages; __init__.py would break mypy.
+# The revision summary comes from the `-m` message via the alembic template, so it
+# is not a sentence (D415).
+"src/telegramus/infrastructure/persistence/migrations/**/*.py" = [
+    "N999",
+    "INP001",
+    "D415",
+]
+# Tests: asserts are the point (S101); fake credentials and magic literals are
+# expected fixture data (S105/S106/S107/PLR2004); object-mother factories take
+# many keyword args (PLR0913); private access is fine in tests (SLF001).
+"tests/**/*.py" = ["S101", "S105", "S106", "S107", "PLR2004", "PLR0913", "SLF001"]
+
+
+[lint.flake8-type-checking]
+# dature/adaptix resolves dataclass field annotations at runtime via
+# get_type_hints, so imports used only in field annotations must stay
+# importable — don't push them into a TYPE_CHECKING block.
+runtime-evaluated-decorators = ["dataclasses.dataclass"]
+
+[lint.isort]
+case-sensitive = true
+combine-as-imports = true
+force-wrap-aliases = true
+
+[lint.pydocstyle]
+convention = "google"
+ignore-decorators = ["typing.overload"]
+
+[lint.flake8-pytest-style]
+fixture-parentheses = true
+mark-parentheses = true
+parametrize-names-type = "tuple"
+parametrize-values-type = "tuple"
+parametrize-values-row-type = "tuple"

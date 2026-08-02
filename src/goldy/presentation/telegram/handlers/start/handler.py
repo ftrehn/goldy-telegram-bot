@@ -6,6 +6,7 @@ from aiogram.enums import ChatType
 from aiogram.filters import CommandStart
 from aiogram.types import Contact, Message
 from aiogram_i18n import I18nContext
+from dishka import FromDishka
 
 from goldy.application.commands.users.register_user.command import RegisterUserCommand
 from goldy.application.common.mediator.sender import Sender
@@ -55,14 +56,20 @@ async def handle_start(
     )
 
 
-@router.message(F.contact)
+@router.message(F.contact.as_("contact"))
 async def handle_shared_contact(
     message: Message,
     contact: Contact,
-    sender: Sender,
+    sender: FromDishka[Sender],
     i18n: I18nContext,
 ) -> None:
     """Registers whoever just shared their own contact.
+
+    ``F.contact.as_("contact")`` rather than a bare ``F.contact``: the filter
+    only decides *whether* to run without it, and aiogram then calls this with
+    no ``contact`` at all. ``Sender`` needs ``FromDishka`` for the same class of
+    reason — the container fills annotated parameters and ignores the rest.
+    Both fail at call time, as a ``TypeError`` about missing arguments.
 
     The ownership check is the security boundary of the whole bot: Telegram
     lets anyone forward a card from their address book, and registration links

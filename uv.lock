@@ -82,6 +82,18 @@ wheels = [
 ]
 
 [[package]]
+name = "aiogram-testing"
+version = "1.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiogram" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/93/49/703a3be9c1e8ba047ac2d5a03d45ca824c57acbe02fd338b1d6850c2022c/aiogram_testing-1.1.0.tar.gz", hash = "sha256:37f8d83177cb783b9b438f5d88d8004767cab4805dd0fa5b07df2ffe145883fa", size = 9108, upload-time = "2026-05-29T23:10:28.001Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/63/eb5d30dc9d0c89ca4f5f187d1820160d3e6861792f20988649fec756b9bf/aiogram_testing-1.1.0-py3-none-any.whl", hash = "sha256:46b56d08a7f0890ecb5e846b63f18a607c956d6c3a3a3b5fd173c2c2db5e5780", size = 11736, upload-time = "2026-05-29T23:10:26.843Z" },
+]
+
+[[package]]
 name = "aiohappyeyeballs"
 version = "2.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -829,6 +841,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "aiogram-testing" },
     { name = "bandit" },
     { name = "codespell" },
     { name = "coverage" },
@@ -856,6 +869,7 @@ lint = [
     { name = "zizmor" },
 ]
 test = [
+    { name = "aiogram-testing" },
     { name = "coverage" },
     { name = "httpx" },
     { name = "nox" },
@@ -887,6 +901,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "aiogram-testing", specifier = ">=1.1.0" },
     { name = "bandit", specifier = ">=1.8.6" },
     { name = "codespell", specifier = ">=2.4.1" },
     { name = "coverage", specifier = ">=7.13.4" },
@@ -914,6 +929,7 @@ lint = [
     { name = "zizmor", specifier = ">=1.14.2" },
 ]
 test = [
+    { name = "aiogram-testing", specifier = ">=1.1.0" },
     { name = "coverage", specifier = ">=7.13.4" },
     { name = "httpx", specifier = ">=0.28.0" },
     { name = "nox", specifier = ">=2025.5.1" },

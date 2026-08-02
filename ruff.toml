@@ -78,8 +78,19 @@ ignore = [
 "src/goldy/presentation/telegram/handlers/**/callbacks.py" = ["RUF029"]
 # Tests: asserts are the point (S101); fake credentials and magic literals are
 # expected fixture data (S105/S106/S107/PLR2004); object-mother factories take
-# many keyword args (PLR0913); private access is fine in tests (SLF001).
-"tests/**/*.py" = ["S101", "S105", "S106", "S107", "PLR2004", "PLR0913", "SLF001"]
+# many keyword args (PLR0913); a test names every fixture it needs and pytest
+# passes them by name, so the positional count says nothing (PLR0917); private
+# access is fine in tests (SLF001).
+"tests/**/*.py" = [
+    "S101",
+    "S105",
+    "S106",
+    "S107",
+    "PLR2004",
+    "PLR0913",
+    "PLR0917",
+    "SLF001",
+]
 
 
 [lint.flake8-type-checking]

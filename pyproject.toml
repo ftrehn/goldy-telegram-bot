@@ -68,6 +68,10 @@ lint = [
     "import-linter>=2.10",
 ]
 test = [
+    # The maintained fork of aiogram_tests: the original pins aiogram 3.0.0b7 and
+    # calls `Bot.set_current`, which no longer exists. Only `MockedSession` and
+    # `types.dataset` are used — the dispatcher under test is the real one.
+    "aiogram-testing>=1.1.0",
     "httpx>=0.28.0",
     "nox>=2025.5.1",
     "pytest>=8.4.2",

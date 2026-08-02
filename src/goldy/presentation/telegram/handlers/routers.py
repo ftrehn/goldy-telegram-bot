@@ -19,37 +19,40 @@ from goldy.presentation.telegram.handlers.profile import (
 )
 from goldy.presentation.telegram.handlers.start.handler import router as start_router
 
-ROUTERS: Final[Iterable[Router]] = (
+FEATURE_ROUTERS: Final[Iterable[Router]] = (
     start_router,
     help_router,
     profile_router,
     admin_router,
-    fallback_router,
-    errors_router,
 )
-"""Every router, in the order aiogram tries them.
-
-Order is load-bearing at the end. ``fallback_router`` matches everything, so
-anything below it would never run; ``errors_router`` observes failures rather
-than messages, and sits last to say so.
-"""
+"""The routers that claim an update because they recognise it."""
 
 DIALOGS: Final[Iterable[Dialog]] = (PROFILE_DIALOG, ADMIN_DIALOG)
-"""Dialogs, which are routers too — aiogram-dialog builds them as such."""
+"""Dialogs, which are routers too — aiogram-dialog builds them as such.
+
+They must be attached before ``fallback_router``, and that is not a style
+preference. A window waiting on typed input — a new name, a reason for a block
+— matches through the dialog's own ``MessageInput``, and the fallback matches
+*everything*. Below it, every such window silently receives "unknown command"
+instead of what the person typed.
+"""
+
+LAST_ROUTERS: Final[Iterable[Router]] = (fallback_router, errors_router)
+"""What has to come after everything else.
+
+``fallback_router`` matches any message, so anything below it would never run;
+``errors_router`` observes failures rather than messages, and sits last to say
+so.
+"""
 
 
 def setup_all_handlers(dp: Dispatcher) -> None:
-    """Attaches every router to the dispatcher, in matching order."""
-    for router in ROUTERS:
-        dp.include_router(router)
+    """Attaches every router, in the order aiogram will try them.
 
-
-def setup_all_dialogs(dp: Dispatcher) -> None:
-    """Attaches every aiogram-dialog window.
-
-    Separate from the handlers because ``setup_dialogs`` has to run after them
-    — it registers the machinery the dialogs need, and it needs to see them
-    first.
+    One function rather than one per kind, because the ordering constraint runs
+    *across* the kinds: dialogs sit between the feature routers and the
+    catch-all, and splitting the attachment in two is how they ended up on the
+    wrong side of it.
     """
-    for dialog in DIALOGS:
-        dp.include_router(dialog)
+    for router in (*FEATURE_ROUTERS, *DIALOGS, *LAST_ROUTERS):
+        dp.include_router(router)

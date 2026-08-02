@@ -4,9 +4,11 @@ from typing import Final
 from faststream.rabbit import RabbitBroker
 from taskiq import AsyncBroker, ScheduleSource, TaskiqScheduler, async_shared_broker
 from taskiq.middlewares import SmartRetryMiddleware
+from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_aio_pika import AioPikaBroker, Exchange, Queue
 from taskiq_redis import ListRedisScheduleSource, RedisAsyncResultBackend
 
+from goldy.infrastructure.task_manager.tasks import setup_outbox_tasks
 from goldy.setup.configs.rabbitmq_config import RabbitMQConfig
 from goldy.setup.configs.redis_config import RedisConfig
 from goldy.setup.configs.taskiq_config import TaskIQConfig
@@ -93,6 +95,17 @@ def setup_event_broker(rabbitmq_config: RabbitMQConfig) -> RabbitBroker:
     return RabbitBroker(url=rabbitmq_config.uri)
 
 
+def setup_task_manager_tasks(broker: AsyncBroker) -> None:
+    """Registers every background task on the broker.
+
+    Registration is what makes a task name resolvable, and the name is all the
+    scheduler has to go on. A task missing from here does not fail at startup —
+    it fails as work that never happened, which is the hardest kind of failure
+    to notice, so every entry point calls this and so do the tests.
+    """
+    setup_outbox_tasks(broker)
+
+
 def setup_scheduler(
     broker: AsyncBroker,
     schedule_source: ScheduleSource,
@@ -103,8 +116,16 @@ def setup_scheduler(
     broker could drift in queue naming and then silently fire into a queue
     nobody consumes. The scheduler only enqueues — the worker still does the
     work.
+
+    Two sources, because schedules arrive two ways. ``LabelScheduleSource``
+    reads the cron declared at registration, which is what drives the outbox
+    relay; the Redis source holds schedules created at runtime and survives a
+    restart. With only the latter, a cron declared on a task would never fire.
     """
-    return TaskiqScheduler(broker=broker, sources=[schedule_source])
+    return TaskiqScheduler(
+        broker=broker,
+        sources=[LabelScheduleSource(broker), schedule_source],
+    )
 
 
 def setup_schedule_source(redis_config: RedisConfig) -> ScheduleSource:

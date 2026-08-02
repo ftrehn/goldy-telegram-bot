@@ -11,7 +11,7 @@ from aiogram_i18n.cores import BaseCore, FluentRuntimeCore
 
 from goldy.presentation.telegram.common.locale_manager import UserLocaleManager
 from goldy.presentation.telegram.common.locales_path import LOCALES_PATH
-from goldy.presentation.telegram.handlers import setup_all_dialogs, setup_all_handlers
+from goldy.presentation.telegram.handlers import setup_all_handlers
 from goldy.presentation.telegram.middlewares.auth_middleware import AuthMiddleware
 from goldy.presentation.telegram.middlewares.timing_middleware import TimingMiddleware
 from goldy.setup.configs.redis_config import RedisConfig
@@ -108,6 +108,10 @@ def setup_telegram_bot_middlewares(
 
 
 def setup_telegram_routes(dp: Dispatcher) -> None:
+    """Attaches the routers, then the machinery the dialogs among them need.
+
+    ``setup_dialogs`` last, and only last: it registers the middlewares that
+    resolve a dialog context, and it has to see every dialog already attached.
+    """
     setup_all_handlers(dp)
-    setup_all_dialogs(dp)
     setup_dialogs(dp)

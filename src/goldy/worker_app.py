@@ -26,6 +26,7 @@ from goldy.setup.bootstrap.setups.task_manager_setup import (
     setup_schedule_source,
     setup_task_manager,
     setup_task_manager_middlewares,
+    setup_task_manager_tasks,
 )
 from goldy.setup.configs.logging_config import LoggingConfig
 from goldy.setup.ioc.containers import make_worker_container
@@ -51,6 +52,8 @@ def create_worker_taskiq_app() -> AsyncBroker:
         broker=setup_task_manager(configs.taskiq, configs.rabbitmq, configs.redis),
         taskiq_config=configs.taskiq,
     )
+
+    setup_task_manager_tasks(worker_broker)
 
     schedule_source: ScheduleSource = setup_schedule_source(configs.redis)
 

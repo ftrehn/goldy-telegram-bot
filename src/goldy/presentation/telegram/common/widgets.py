@@ -28,10 +28,18 @@ class I18NFormat(Text):
     def __init__(
         self,
         text: str,
-        when: WhenCondition | None = None,
         /,
+        when: WhenCondition | None = None,
         **mapping: Resolvable,
     ) -> None:
+        """Only ``text`` is positional-only, so a placeholder may be called that.
+
+        ``when`` deliberately is not. Marked positional-only it swallowed
+        ``when=`` into ``**mapping``, leaving the condition unset — a widget
+        written to appear conditionally then appeared always, and Fluent
+        silently ignored the stray placeholder. Nothing failed; the screen was
+        simply wrong.
+        """
         super().__init__(when)
         self.text: Final[str] = text
         self.mapping: Final[dict[str, Resolvable]] = dict(mapping)

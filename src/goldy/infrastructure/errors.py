@@ -16,5 +16,6 @@ class OutboxPublishError(InfrastructureError):
 class RepoError(InfrastructureError):
     """Raised when a persistence gateway fails to execute a statement."""
 
+
 class HandlerNotFoundError(InfrastructureError):
     """Raised when a request reaches the mediator with no handler registered."""

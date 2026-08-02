@@ -44,6 +44,9 @@ dependencies = [
     "faststream[rabbit]>=0.7.3",
     "sqlalchemy[asyncio]==2.0.51",
     "structlog==26.1.0",
+    "taskiq>=0.12.4",
+    "taskiq-aio-pika>=0.6.0",
+    "taskiq-redis>=1.2.3",
 ]
 
 [dependency-groups]

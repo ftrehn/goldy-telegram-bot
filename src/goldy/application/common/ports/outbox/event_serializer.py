@@ -1,9 +1,9 @@
 from abc import abstractmethod
 from typing import Protocol
 
-from goldy.domain.common.event import Event
-
 from application.common.ports.outbox.outbox_message import OutboxMessage
+
+from goldy.domain.common.event import Event
 
 
 class EventSerializer(Protocol):

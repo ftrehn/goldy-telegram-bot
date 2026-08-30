@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "hatchling==1.29.0",
+    "hatchling==1.32.0",
     "hatch-vcs==0.5.0",
 ]
 build-backend = "hatchling.build"
@@ -39,15 +39,15 @@ dependencies = [
     "aiogram==3.30.0",
     "aiogram-dialog==2.6.0",
     "aiogram-i18n[fluent-runtime]>=1.5",
-    "alembic>=1.18.5",
+    "alembic>=1.19.1",
     "asyncpg>=0.31.0",
-    "dature==1.1.0",
+    "dature==1.3.0",
     "dishka==1.10.1",
     "faststream[rabbit]>=0.7.3",
     "fluent-runtime>=0.4.0",
-    "sqlalchemy[asyncio]==2.0.51",
+    "sqlalchemy[asyncio]==2.0.52",
     "structlog==26.1.0",
-    "taskiq>=0.12.4",
+    "taskiq>=0.12.5",
     "taskiq-aio-pika>=0.6.0",
     "taskiq-redis>=1.2.3",
 ]
@@ -56,14 +56,14 @@ dependencies = [
 dev = [
     {include-group = "lint"},
     {include-group = "test"},
-    "prek>=0.2.5",
+    "prek>=0.4.14",
 ]
 lint = [
     "bandit>=1.8.6",
     "codespell>=2.4.1",
-    "mypy>=1.18.2",
-    "ruff>=0.14.0",
-    "semgrep>=1.139.0",
+    "mypy>=2.3.1",
+    "ruff>=0.16.4",
+    "semgrep>=1.174.0",
     "zizmor>=1.14.2",
     "import-linter>=2.10",
 ]
@@ -73,13 +73,13 @@ test = [
     # `types.dataset` are used — the dispatcher under test is the real one.
     "aiogram-testing>=1.1.0",
     "httpx>=0.28.0",
-    "nox>=2025.5.1",
+    "nox>=2026.8.17",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "pytest-cov>=7.0.0",
     "pytest-mypy>=1.0.0",
     "testcontainers[postgres]>=4.10.0",
-    "coverage>=7.13.4",
+    "coverage>=7.15.4",
 ]
 
 [tool.bandit]

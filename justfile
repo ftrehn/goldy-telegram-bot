@@ -90,7 +90,7 @@ ci: linter static-analysis test-ci
 [doc("Build the production image")]
 [group("docker")]
 docker-build:
-  docker build -f deploy/prod/answer_service/Dockerfile -t answer-service:local .
+  docker build -t goldy:local .
 
 # Must be `.env` at the root: `env_file:` only reaches the containers, while
 # ${VAR:?} interpolation reads the project env file compose finds by that name.

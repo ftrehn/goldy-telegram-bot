@@ -101,3 +101,39 @@ class CartSummaryView:
     @property
     def is_empty(self) -> bool:
         return self.line_count == 0
+
+
+@dataclass(frozen=True, slots=True)
+class CartRepeatView:
+    """What repeating an order did to the cart, and what it left behind.
+
+    Counts and names, for the reason :class:`CartSummaryView` carries counts:
+    the cart screen re-reads itself through ``GetCartQuery`` on every render, so
+    building a priced view inside the writing transaction would pay for a join
+    presentation throws away.
+
+    :attr:`skipped_product_names` is the exception, and it is the whole point of
+    the view. A product the import dropped is gone from the catalog, so the only
+    place its name still exists is the order line it was snapshotted into —
+    which means a screen cannot look the skipped products up for itself, and the
+    one moment they can be named is while the order is still loaded.
+
+    Two questions the screen asks are properties rather than comparisons at the
+    call site, because "everything moved" and "nothing moved" are different
+    screens and a getter reading them off a count would get the empty order
+    wrong.
+    """
+
+    moved_line_count: int
+    skipped_product_names: tuple[str, ...]
+    line_count: int
+
+    @property
+    def moved_everything(self) -> bool:
+        """Whether the cart now holds every line the order had."""
+        return not self.skipped_product_names
+
+    @property
+    def moved_nothing(self) -> bool:
+        """Whether not one line of the order can be bought today."""
+        return self.moved_line_count == 0

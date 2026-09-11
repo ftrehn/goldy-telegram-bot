@@ -37,7 +37,10 @@ from goldy.domain.carts.entities.cart import MAX_CART_LINES
 from goldy.domain.orders.values.order_status import OrderStatus
 from goldy.domain.users.values.locale import SUPPORTED_LOCALES
 from goldy.presentation.telegram.common import text_keys
-from goldy.presentation.telegram.common.formatting import MESSAGE_LIMIT
+from goldy.presentation.telegram.common.formatting import (
+    MAX_PLACEABLE_LENGTH,
+    MESSAGE_LIMIT,
+)
 from goldy.presentation.telegram.common.order_cards import (
     fit_lines,
     format_order_lines,
@@ -52,6 +55,10 @@ from goldy.presentation.telegram.handlers.manage_orders import (
     ManageOrdersStates,
 )
 from goldy.presentation.telegram.handlers.orders import ORDERS_DIALOG, OrdersStates
+from goldy.presentation.telegram.handlers.orders.getters import (
+    repeat_confirm_data,
+    repeat_result_data,
+)
 from tests.unit.factories.order_factories import (
     make_order_line_view,
     make_order_view,
@@ -417,3 +424,91 @@ def test_the_staff_card_of_a_hundred_line_order_renders_too(
 
     assert all(text.strip() for text in rendered)
     assert max(len(text) for text in rendered) <= MESSAGE_LIMIT
+
+
+CART_POSITIONS: Final[int] = 8
+"""A count that appears nowhere in the order number, so finding it means something."""
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+def test_the_repeat_confirmation_says_what_becomes_of_a_full_cart(
+    locale: str,
+    russian: I18nContext,
+    i18n_core: BaseCore[Any],
+) -> None:
+    """Both sides of the selector, because only one of them is ever drawn.
+
+    A repeat into an empty cart needs no explanation, and that branch of the
+    message is empty on purpose. A repeat into a cart somebody was assembling
+    is a promise about what happens to those positions — and a promise that
+    fails to render is worse than one that was never made, because Fluent
+    answers a broken selector by dropping the whole message.
+    """
+    order = make_order_view()
+    widget = _confirmation_of(OrdersStates.REPEAT_CONFIRM, text_keys.ORDER_REPEAT_CONFIRM)
+
+    empty = _render(i18n_core, widget, locale, repeat_confirm_data(russian, order, 0))
+    filled = _render(
+        i18n_core,
+        widget,
+        locale,
+        repeat_confirm_data(russian, order, CART_POSITIONS),
+    )
+
+    assert empty.strip()
+    assert filled.startswith(empty.strip())
+    assert str(CART_POSITIONS) in filled
+    assert str(CART_POSITIONS) not in empty
+
+
+def _confirmation_of(state: State, key: str) -> I18NFormat:
+    """The one text of a window written with this key, buttons excluded."""
+    return next(widget for widget in _formats(ORDERS_DIALOG, state) if widget.text == key)
+
+
+@pytest.mark.parametrize("locale", LOCALES)
+@pytest.mark.parametrize("moved", (0, 2), ids=("nothing-moved", "some-moved"))
+def test_the_repeat_result_renders_whichever_outcome_it_is_drawn_for(
+    locale: str,
+    moved: int,
+    russian: I18nContext,
+    i18n_core: BaseCore[Any],
+) -> None:
+    """One window, two mutually exclusive texts, and no third outcome here.
+
+    A repeat that carried everything over never reaches this screen — it is
+    answered with a toast — so the window has to be legible both when something
+    was left behind and when nothing could be taken at all.
+    """
+    data = repeat_result_data(russian, moved, ("Товар 3", "Товар 4"))
+
+    rendered = [
+        _render(i18n_core, widget, locale, data)
+        for widget in _formats(ORDERS_DIALOG, OrdersStates.REPEAT_RESULT)
+    ]
+
+    assert all(text.strip() for text in rendered)
+    assert data["moved_some"] is not data["moved_nothing"]
+
+
+def test_a_hundred_withdrawn_products_still_fit_in_one_message(
+    russian: I18nContext,
+) -> None:
+    """The skipped list is a single placeable, which is where Fluent gives up.
+
+    A wholesale order of a hundred positions whose supplier has gone is exactly
+    the case this screen exists for, and every one of those names may be the
+    255 characters 1C allows. Unshortened the message does not come out
+    truncated — it does not come out, and the person is left with no idea what
+    happened to their repeat.
+    """
+    skipped = (MAX_PRODUCT_NAME,) * MAX_CART_LINES
+
+    data = repeat_result_data(russian, 0, skipped)
+
+    assert len(data["skipped"]) <= MAX_PLACEABLE_LENGTH
+    assert russian.get(
+        text_keys.ORDER_REPEAT_PARTIAL,
+        moved=data["moved"],
+        skipped=data["skipped"],
+    ).strip()

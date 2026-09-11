@@ -1,0 +1,82 @@
+# Local development services: everything the bot needs that is not the bot.
+#
+# Host ports are offset from the defaults — 5434, 6380, 5673 — because this
+# machine already runs PostgreSQL on both 5432 and 5433 for 1C, and Docker
+# reports the clash as a permission error rather than as a busy port. Set the
+# matching *_PORT variables in .env; .env.example ships the default ports.
+#
+#   docker compose -f docker-compose.dev.yml up -d
+#   uv run --frozen alembic upgrade head
+#   python -m goldy.telegram_bot
+#
+# Data survives restarts in named volumes. To start over:
+#   docker compose -f docker-compose.dev.yml down -v
+
+name: goldy-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: goldy_dev_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: goldy
+      POSTGRES_PASSWORD: goldy
+      POSTGRES_DB: goldy
+      # Values the bot never sets and the tests rely on: the catalog search
+      # normalises through translate() and to_tsvector('russian', ...), both of
+      # which behave differently under a non-UTF8 encoding.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U goldy -d goldy"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: goldy_dev_redis
+    restart: unless-stopped
+    # Four logical databases live here — worker results, schedule source, cache
+    # and dialog state — and they are separated by index, not by instance, so a
+    # single container is the whole of it.
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: goldy_dev_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "127.0.0.1:5673:5672"
+      # Management UI on http://127.0.0.1:15673 — guest/guest. Worth opening the
+      # first time the outbox relay runs: whether a domain event reached the
+      # exchange is otherwise only visible in logs.
+      - "127.0.0.1:15673:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:

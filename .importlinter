@@ -46,3 +46,13 @@ protected_modules =
 allowed_importers =
     goldy.infrastructure
     goldy.setup
+
+
+[importlinter:contract:domain_package_layers]
+name = Domain packages depend in one direction (orders -> carts -> users -> catalog)
+type = layers
+layers =
+    goldy.domain.orders
+    goldy.domain.carts
+    goldy.domain.users
+    goldy.domain.catalog

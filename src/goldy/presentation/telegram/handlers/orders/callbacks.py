@@ -93,7 +93,7 @@ async def on_cancel_confirmed(
 
     The confirmation screen exists because this cannot be undone: there is no
     way back out of ``CANCELLED`` in the transition table, and a buyer who
-    meant to open the card would otherwise lose the order to a mis-tap.
+    meant to open the card would otherwise lose the order to a stray tap.
 
     No reason is asked for. Somebody withdrawing their own order owes nobody an
     explanation, and the asymmetry with a manager cancelling somebody else's is

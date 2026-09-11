@@ -129,7 +129,7 @@ ORDERS_DIALOG: Final[Dialog] = Dialog(
 The two confirmation-free screens are deliberate and the one confirmation is
 too. Retyping an address is reversible — retype it again — so it costs a tap
 and no question. Cancelling is not: ``CANCELLED`` has no transitions out of it,
-and an order taken back by a mis-tap has to be placed a second time from an
+and an order taken back by a stray tap has to be placed a second time from an
 empty cart.
 
 The cancellation screen shares the card's getter rather than caching the

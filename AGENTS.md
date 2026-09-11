@@ -465,6 +465,19 @@ Read the relevant entry before touching that area.
   failure there would reach an error handler with no context to render with, and
   the person would get nothing at all.
 
+**Testing**
+
+- **Never build a mapped entity at module level in a test.** Collection imports
+  every test module before the first test runs, so the instance is created
+  before `setup_map_tables()` has mapped its class; reading a composite off it
+  afterwards raises a missing `_sa_instance_state`. The suite passes when unit
+  tests run alone and fails when they run beside the integration ones, which is
+  the shape of failure that costs the most to find. Build entities inside the
+  test or in a fixture.
+- **Run `pytest tests` before claiming green, not `tests/unit` and
+  `tests/integration` separately.** CI runs them in one process, and imperative
+  mapping is process-wide state — the split hides exactly the bug above.
+
 **Tooling**
 
 - **`PLR0913` counts keyword-only arguments.** Six named parameters trip it even

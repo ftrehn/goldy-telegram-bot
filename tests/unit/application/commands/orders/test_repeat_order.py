@@ -27,6 +27,7 @@ from goldy.application.error import OrderNotFoundError
 from goldy.domain.carts.entities.cart import MAX_CART_LINES
 from goldy.domain.carts.errors import CartLineLimitExceededError
 from goldy.domain.orders.entities.order import Order
+from goldy.domain.orders.entities.order_line import OrderLine
 from goldy.domain.users.errors import AuthorizationError
 from tests.unit.application.conftest import ActingAs, UserSeeder
 from tests.unit.factories.order_factories import make_priced_product_view
@@ -36,11 +37,22 @@ from tests.unit.stubs.orders import InMemoryCartCommandGateway
 
 from .conftest import CartSeeder, OrderSeeder
 
-TWO_LINES = (
-    make_order_line(position=1, index=1, quantity=2),
-    make_order_line(position=2, index=2, quantity=3),
-)
-"""Product 1 twice and product 2 three times, which is an ordinary small order."""
+
+def two_lines() -> tuple[OrderLine, ...]:
+    """Product 1 twice and product 2 three times, an ordinary small order.
+
+    Built per test rather than held in a module constant. Collection imports
+    every test module before the first test runs, so a line built at module
+    level exists before ``setup_map_tables()`` has mapped ``OrderLine`` - and
+    reading a composite off an instance the mapper never instrumented raises
+    ``_sa_instance_state``. Unit tests pass alone and fail in the suite CI
+    runs, which is the worst shape a failure can take.
+    """
+    return (
+        make_order_line(position=1, index=1, quantity=2),
+        make_order_line(position=2, index=2, quantity=3),
+    )
+
 
 SECOND_PRODUCT_NAME = "Товар 2"
 """How the builders name product 2, which is how its order line names it."""
@@ -68,7 +80,7 @@ async def test_an_order_that_still_sells_goes_back_in_the_cart_whole(
 ) -> None:
     customer = await seed_user()
     acting_as(customer.id)
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = (
         make_priced_product_view(1),
         make_priced_product_view(2),
@@ -102,7 +114,7 @@ async def test_the_price_is_read_afresh_and_never_taken_from_the_snapshot(
     """
     customer = await seed_user()
     acting_as(customer.id)
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = (
         make_priced_product_view(1, price="1000.00"),
         make_priced_product_view(2, price="1000.00"),
@@ -124,7 +136,7 @@ async def test_a_product_the_catalog_has_lost_is_left_behind_by_name(
     """Named off the snapshot, because nowhere else still holds the name."""
     customer = await seed_user()
     acting_as(customer.id)
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = (make_priced_product_view(1),)
 
     view = await repeat_order_handler.handle(repeat(order))
@@ -154,7 +166,7 @@ async def test_a_product_a_sweep_deactivated_is_left_behind_as_well(
     """
     customer = await seed_user()
     acting_as(customer.id)
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = (make_priced_product_view(1),)
 
     view = await repeat_order_handler.handle(repeat(order))
@@ -180,7 +192,7 @@ async def test_a_product_this_price_list_no_longer_covers_is_left_behind(
     """
     customer = await seed_user()
     acting_as(customer.id)
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = (
         make_priced_product_view(1),
         make_priced_product_view(2, price=None),
@@ -209,7 +221,7 @@ async def test_an_order_nothing_of_which_still_sells_moves_nothing(
     """
     customer = await seed_user()
     acting_as(customer.id)
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = ()
 
     view = await repeat_order_handler.handle(repeat(order))
@@ -238,7 +250,7 @@ async def test_what_was_already_in_the_cart_stays_where_it_was(
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, {1: 7, 3: 4})
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = (
         make_priced_product_view(1),
         make_priced_product_view(2),
@@ -272,7 +284,7 @@ async def test_repeating_twice_leaves_the_cart_the_first_one_left(
     """
     customer = await seed_user()
     acting_as(customer.id)
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = (
         make_priced_product_view(1),
         make_priced_product_view(2),
@@ -303,7 +315,7 @@ async def test_a_cart_with_no_room_left_refuses_instead_of_filling_up(
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, dict.fromkeys(range(10, 10 + MAX_CART_LINES), 1))
-    order = seed_order(customer.id, lines=TWO_LINES)
+    order = seed_order(customer.id, lines=two_lines())
     pricing_gateway.priced_products = (
         make_priced_product_view(1),
         make_priced_product_view(2),
@@ -333,7 +345,7 @@ async def test_somebody_elses_order_cannot_be_repeated(
     owner = await seed_user(phone_number="+79991112233", external_id="111")
     intruder = await seed_user(phone_number="+79994445566", external_id="222")
     acting_as(intruder.id)
-    seed_order(owner.id, lines=TWO_LINES)
+    seed_order(owner.id, lines=two_lines())
     pricing_gateway.priced_products = (make_priced_product_view(1),)
 
     with pytest.raises(AuthorizationError):

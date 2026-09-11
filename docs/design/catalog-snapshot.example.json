@@ -1,0 +1,132 @@
+{
+  "batch_id": "seed-2026-09-11-01",
+  "scope": {
+    "kind": "products"
+  },
+  "categories": [
+    {
+      "id": "9f1c0a12-0000-4000-8000-000000000001",
+      "parent_id": null,
+      "name": "Крепёж",
+      "source_changed_at": "2026-09-10T08:15:00+03:00"
+    },
+    {
+      "id": "9f1c0a12-0000-4000-8000-000000000002",
+      "parent_id": "9f1c0a12-0000-4000-8000-000000000001",
+      "name": "Болты",
+      "source_changed_at": "2026-09-10T08:15:00+03:00"
+    },
+    {
+      "id": "9f1c0a12-0000-4000-8000-000000000003",
+      "parent_id": null,
+      "name": "Электроинструмент",
+      "source_changed_at": "2026-09-10T08:15:00+03:00"
+    }
+  ],
+  "products": [
+    {
+      "id": "3b7d5e60-0000-4000-8000-00000000000a",
+      "sku": "AB-12345",
+      "name": "Болт М8х40 оцинкованный",
+      "full_name": "Болт М8х40 DIN 933 оцинкованный, класс прочности 8.8",
+      "category_id": "9f1c0a12-0000-4000-8000-000000000002",
+      "unit_id": "u-796",
+      "unit_name": "шт",
+      "unit_ratio": "1",
+      "description": "Болт с шестигранной головкой и полной резьбой.",
+      "image_url": "https://example.invalid/img/bolt-m8x40.jpg",
+      "source_changed_at": "2026-09-10T09:00:00+03:00"
+    },
+    {
+      "id": "3b7d5e60-0000-4000-8000-00000000000b#char-1",
+      "sku": null,
+      "name": "Гайка М8 оцинкованная",
+      "category_id": "9f1c0a12-0000-4000-8000-000000000002",
+      "unit_id": "u-796",
+      "unit_name": "уп",
+      "unit_ratio": "100",
+      "source_changed_at": "2026-09-10T09:00:00+03:00"
+    },
+    {
+      "id": "3b7d5e60-0000-4000-8000-00000000000c",
+      "sku": "DR-900",
+      "name": "Дрель ударная 900 Вт",
+      "category_id": "9f1c0a12-0000-4000-8000-000000000003",
+      "unit_id": "u-796",
+      "unit_name": "шт",
+      "source_changed_at": "2026-09-10T09:05:00+03:00"
+    }
+  ],
+  "price_types": [
+    {
+      "id": "pt-retail",
+      "name": "Розничная",
+      "currency": "RUB",
+      "source_changed_at": "2026-09-01T00:00:00+03:00"
+    },
+    {
+      "id": "pt-wholesale",
+      "name": "Оптовая",
+      "currency": "RUB",
+      "source_changed_at": "2026-09-01T00:00:00+03:00"
+    }
+  ],
+  "prices": [
+    {
+      "product_id": "3b7d5e60-0000-4000-8000-00000000000a",
+      "price_type_id": "pt-retail",
+      "amount": "12.40",
+      "currency": "RUB",
+      "source_changed_at": "2026-09-10T09:10:00+03:00"
+    },
+    {
+      "product_id": "3b7d5e60-0000-4000-8000-00000000000a",
+      "price_type_id": "pt-wholesale",
+      "amount": "9.80",
+      "currency": "RUB",
+      "source_changed_at": "2026-09-10T09:10:00+03:00"
+    },
+    {
+      "product_id": "3b7d5e60-0000-4000-8000-00000000000b#char-1",
+      "price_type_id": "pt-retail",
+      "amount": "380.00",
+      "currency": "RUB",
+      "source_changed_at": "2026-09-10T09:10:00+03:00"
+    },
+    {
+      "product_id": "3b7d5e60-0000-4000-8000-00000000000c",
+      "price_type_id": "pt-retail",
+      "amount": "7490.00",
+      "currency": "RUB",
+      "source_changed_at": "2026-09-10T09:10:00+03:00"
+    }
+  ],
+  "stock": [
+    {
+      "product_id": "3b7d5e60-0000-4000-8000-00000000000a",
+      "warehouse_id": "*",
+      "quantity": "1420.000",
+      "source_changed_at": "2026-09-11T07:00:00+03:00"
+    },
+    {
+      "product_id": "3b7d5e60-0000-4000-8000-00000000000b#char-1",
+      "warehouse_id": "*",
+      "quantity": "36.000",
+      "source_changed_at": "2026-09-11T07:00:00+03:00"
+    },
+    {
+      "product_id": "3b7d5e60-0000-4000-8000-00000000000c",
+      "warehouse_id": "*",
+      "quantity": "0.000",
+      "source_changed_at": "2026-09-11T07:00:00+03:00"
+    }
+  ],
+  "price_type_bindings": [
+    {
+      "phone_number": "+79990000001",
+      "price_type_id": "pt-wholesale",
+      "source_counterparty_id": "cp-000123",
+      "source_changed_at": "2026-09-05T12:00:00+03:00"
+    }
+  ]
+}

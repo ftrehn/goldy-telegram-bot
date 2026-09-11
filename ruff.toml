@@ -76,11 +76,21 @@ ignore = [
 # sync breaks the protocol; the rule cannot see that.
 "src/goldy/presentation/telegram/handlers/**/getters.py" = ["RUF029"]
 "src/goldy/presentation/telegram/handlers/**/callbacks.py" = ["RUF029"]
+# Same contract, one module further out: the shared pager builds the ``on_click``
+# for its two buttons, and turning a page is a dictionary write with nothing to
+# await. The alternative is four dialogs each writing the same async wrapper.
+"src/goldy/presentation/telegram/common/paging.py" = ["RUF029"]
 # Tests: asserts are the point (S101); fake credentials and magic literals are
 # expected fixture data (S105/S106/S107/PLR2004); object-mother factories take
 # many keyword args (PLR0913); a test names every fixture it needs and pytest
 # passes them by name, so the positional count says nothing (PLR0917); private
 # access is fine in tests (SLF001).
+# The presentation tests assert the exact text a Russian-speaking customer
+# reads, so their expected values mix Cyrillic with Latin punctuation and digits
+# — which is precisely the shape RUF001 warns about. Here the "ambiguous"
+# character is the correct one, and spelling it any other way would stop the
+# assertion from testing the string that ships.
+"tests/unit/presentation/**/*.py" = ["RUF001"]
 "tests/**/*.py" = [
     "S101",
     "S105",

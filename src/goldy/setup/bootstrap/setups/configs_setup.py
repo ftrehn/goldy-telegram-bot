@@ -8,6 +8,10 @@ from taskiq import AsyncBroker, ScheduleSource
 
 from goldy.setup.bootstrap.loaders.admin_config_loader import AdminConfigLoader
 from goldy.setup.bootstrap.loaders.alchemy_config_loader import SQLAlchemyConfigLoader
+from goldy.setup.bootstrap.loaders.catalog_config_loader import CatalogConfigLoader
+from goldy.setup.bootstrap.loaders.notification_config_loader import (
+    NotificationConfigLoader,
+)
 from goldy.setup.bootstrap.loaders.postgres_config_loader import PostgresConfigLoader
 from goldy.setup.bootstrap.loaders.rabbitmq_config_loader import RabbitMQConfigLoader
 from goldy.setup.bootstrap.loaders.redis_config_loader import RedisConfigLoader
@@ -16,6 +20,12 @@ from goldy.setup.bootstrap.loaders.telegram_config_loader import TelegramConfigL
 from goldy.setup.bootstrap.sources.admin_env_source_factory import AdminEnvSourceFactory
 from goldy.setup.bootstrap.sources.alchemy_env_source_factory import (
     SQLAlchemyEnvSourceFactory,
+)
+from goldy.setup.bootstrap.sources.catalog_env_source_factory import (
+    CatalogEnvSourceFactory,
+)
+from goldy.setup.bootstrap.sources.notification_env_source_factory import (
+    NotificationEnvSourceFactory,
 )
 from goldy.setup.bootstrap.sources.postgres_env_source_factory import (
     PostgresEnvSourceFactory,
@@ -32,6 +42,8 @@ from goldy.setup.bootstrap.sources.telegram_env_source_factory import (
 )
 from goldy.setup.configs.admin_config import AdminConfig
 from goldy.setup.configs.alchemy_config import SQLAlchemyConfig
+from goldy.setup.configs.catalog_config import CatalogConfig
+from goldy.setup.configs.notification_config import NotificationConfig
 from goldy.setup.configs.postgres_config import PostgresConfig
 from goldy.setup.configs.rabbitmq_config import RabbitMQConfig
 from goldy.setup.configs.redis_config import RedisConfig
@@ -57,6 +69,7 @@ class SharedConfigs:
     rabbitmq: RabbitMQConfig
     taskiq: TaskIQConfig
     admin: AdminConfig
+    catalog: CatalogConfig
 
     def as_context(self) -> dict[type, object]:
         """Keys these by the type the container provides them as."""
@@ -67,6 +80,7 @@ class SharedConfigs:
             RabbitMQConfig: self.rabbitmq,
             TaskIQConfig: self.taskiq,
             AdminConfig: self.admin,
+            CatalogConfig: self.catalog,
         }
 
 
@@ -87,12 +101,25 @@ def load_shared_configs() -> SharedConfigs:
         rabbitmq=RabbitMQConfigLoader(RabbitMQEnvSourceFactory()).load(),
         taskiq=TaskIQConfigLoader(TaskIQEnvSourceFactory()).load(),
         admin=AdminConfigLoader(AdminEnvSourceFactory()).load(),
+        catalog=CatalogConfigLoader(CatalogEnvSourceFactory()).load(),
     )
 
 
 def load_telegram_config() -> TelegramConfig:
-    """Read only by the bot process — a worker has no token and needs none."""
+    """Read only by the bot process — how *that* process is wired."""
     return TelegramConfigLoader(TelegramEnvSourceFactory()).load()
+
+
+def load_notification_config() -> NotificationConfig:
+    """Read only by the worker — the token it writes to people with.
+
+    The same variable the bot reads, and a different object. The bot needs
+    dialogue storage, event isolation and a default locale; the notifier needs
+    a token and nothing else, and giving it the whole :class:`TelegramConfig`
+    would put that object in the shared provider where every process could
+    reach the secret.
+    """
+    return NotificationConfigLoader(NotificationEnvSourceFactory()).load()
 
 
 def make_worker_container_context(
@@ -100,18 +127,26 @@ def make_worker_container_context(
     broker: AsyncBroker,
     schedule_source: ScheduleSource,
     event_broker: RabbitBroker,
+    notification_config: NotificationConfig,
 ) -> dict[type, object]:
     """The context the worker's container is built from.
 
     The three runtime objects cannot come from the container: the broker has to
     exist before tasks are registered on it, and the container is what the
     tasks resolve their dependencies from.
+
+    ``NotificationConfig`` enters the same way ``TelegramConfig`` does for the
+    bot — through the process that has one, never through the shared configs
+    bundle. A worker without it fails to build its container at startup, which
+    is the failure we want: the alternative is a worker that runs happily and
+    is silent about every order.
     """
     return {
         **configs.as_context(),
         AsyncBroker: broker,
         ScheduleSource: schedule_source,
         RabbitBroker: event_broker,
+        NotificationConfig: notification_config,
     }
 
 

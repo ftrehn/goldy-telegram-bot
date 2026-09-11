@@ -7,7 +7,13 @@ from goldy.application.common.ports.outbox.outbox_message import OutboxMessage
 from goldy.application.common.ports.outbox.outbox_publisher import OutboxPublisher
 from goldy.infrastructure.errors import OutboxPublishError
 
-_EVENTS_EXCHANGE: Final[str] = "domain_events"
+EVENTS_EXCHANGE: Final[str] = "domain_events"
+"""The topic exchange every domain event is published to.
+
+Public rather than private because the notification consumers bind to it, and
+an exchange name spelled twice is an exchange name that eventually differs —
+which looks exactly like messages being published into nothing.
+"""
 
 
 @final
@@ -31,7 +37,7 @@ class FastStreamOutboxPublisher(OutboxPublisher):
     def __init__(self, broker: RabbitBroker) -> None:
         self._broker: Final[RabbitBroker] = broker
         self._exchange: Final[RabbitExchange] = RabbitExchange(
-            _EVENTS_EXCHANGE,
+            EVENTS_EXCHANGE,
             type=ExchangeType.TOPIC,
             durable=True,
         )

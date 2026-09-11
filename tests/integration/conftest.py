@@ -24,6 +24,7 @@ import os
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 from collections.abc import AsyncIterator, Iterator
+from dataclasses import replace
 from pathlib import Path
 from typing import Final
 
@@ -32,8 +33,9 @@ from dishka import AsyncContainer, Scope
 from dishka.integrations.taskiq import setup_dishka as setup_taskiq_dishka
 from faststream.rabbit import RabbitBroker, TestRabbitBroker
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import clear_mappers
+from sqlalchemy.pool import NullPool
 from taskiq import AsyncBroker, InMemoryBroker, ScheduleSource
 from taskiq.schedule_sources import LabelScheduleSource
 from testcontainers.community.postgres import PostgresContainer
@@ -61,6 +63,8 @@ from goldy.setup.bootstrap.setups.database_setup import setup_map_tables
 from goldy.setup.bootstrap.setups.task_manager_setup import setup_task_manager_tasks
 from goldy.setup.configs.admin_config import AdminConfig
 from goldy.setup.configs.alchemy_config import SQLAlchemyConfig
+from goldy.setup.configs.catalog_config import CatalogConfig
+from goldy.setup.configs.notification_config import NotificationConfig
 from goldy.setup.configs.postgres_config import PostgresConfig
 from goldy.setup.configs.taskiq_config import TaskIQConfig
 from goldy.setup.configs.telegram_config import TelegramConfig
@@ -85,9 +89,12 @@ from tests.unit.factories.domain_factories import (
     make_registration,
 )
 from tests.unit.factories.outbox_factories import make_outbox_message
+from tests.unit.factories.shop_factories import PRICE_TYPE_ID
 
 POSTGRES_IMAGE: Final[str] = "postgres:17-alpine"
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
+MIGRATION_CHECK_DB_NAME: Final[str] = "goldy_migration_check"
+"""The database the migrations are replayed into from nothing."""
 
 # Session-scoped async fixtures and the tests must share one loop, or the engine
 # is created on a loop that is gone by the time a test uses it.
@@ -143,6 +150,7 @@ def shared_configs(
         rabbitmq=create_rabbitmq_config(),
         taskiq=TaskIQConfig(),
         admin=AdminConfig(phone_numbers=ADMIN_PHONE),
+        catalog=CatalogConfig(default_price_type_id=PRICE_TYPE_ID),
     )
 
 
@@ -183,6 +191,38 @@ def _schema(postgres_config: PostgresConfig) -> None:
     repository and generates them with a skill, so the failure worth catching is
     a migration that has fallen behind the mappers. Building the schema from the
     mappers themselves would hide precisely that.
+    """
+    _upgrade_to_head(postgres_config)
+
+
+@pytest.fixture(scope="session")
+async def migrated_database(
+    postgres_config: PostgresConfig,
+) -> AsyncIterator[AsyncEngine]:
+    """A database of its own, taken from nothing to head by the migrations.
+
+    Separate from the one every other test runs against, and that separation is
+    the whole point. "The migrations build this schema out of an empty
+    database" can only be shown on an empty database, and the session one has
+    been migrated already — asking it would answer with the answer from before.
+
+    The engine is built here rather than taken from a container because no
+    container is pointed at this database: what is under test is the schema,
+    not anything that reads it. ``NullPool`` because two statements are run
+    against it in total and a pool would outlive the test that wanted it.
+    """
+    fresh = replace(postgres_config, db_name=MIGRATION_CHECK_DB_NAME)
+
+    await _recreate_database(postgres_config, MIGRATION_CHECK_DB_NAME)
+    _upgrade_to_head(fresh)
+
+    engine = create_async_engine(fresh.uri, poolclass=NullPool)
+    yield engine
+    await engine.dispose()
+
+
+def _upgrade_to_head(config: PostgresConfig) -> None:
+    """Runs the migrations the way a deployment runs them, and reports failure.
 
     A subprocess because ``migrations/env.py`` calls ``setup_map_tables()`` on
     import, and this process has already done so.
@@ -190,7 +230,7 @@ def _schema(postgres_config: PostgresConfig) -> None:
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=PROJECT_ROOT,
-        env={**os.environ, **_postgres_env(postgres_config)},
+        env={**os.environ, **_postgres_env(config)},
         capture_output=True,
         text=True,
         check=False,
@@ -198,10 +238,26 @@ def _schema(postgres_config: PostgresConfig) -> None:
 
     if result.returncode != 0:
         pytest.fail(
-            "alembic upgrade head failed:\n"
+            f"alembic upgrade head against '{config.db_name}' failed:\n"
             f"--- stdout ---\n{result.stdout}\n"
             f"--- stderr ---\n{result.stderr}",
         )
+
+
+async def _recreate_database(config: PostgresConfig, db_name: str) -> None:
+    """Drops and creates a database beside the one the tests use.
+
+    ``AUTOCOMMIT`` because Postgres refuses ``CREATE DATABASE`` inside a
+    transaction block, and the identifier is quoted rather than bound because
+    DDL takes no parameters — it is a constant of this module, not input.
+    """
+    engine = create_async_engine(config.uri, isolation_level="AUTOCOMMIT")
+
+    async with engine.connect() as connection:
+        await connection.execute(text(f'DROP DATABASE IF EXISTS "{db_name}"'))
+        await connection.execute(text(f'CREATE DATABASE "{db_name}"'))
+
+    await engine.dispose()
 
 
 def _postgres_env(config: PostgresConfig) -> dict[str, str]:
@@ -297,6 +353,7 @@ async def worker_container(
             taskiq_broker,
             schedule_source,
             event_broker,
+            NotificationConfig(bot_token=RecordingBot.TOKEN),
         ),
     )
     setup_taskiq_dishka(container, broker=taskiq_broker)

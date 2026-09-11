@@ -8,7 +8,64 @@ error-blocked = Your access has been restricted. Please contact support.
 error-not-found = Not found.
 error-already-exists = That number or account is already taken. Please try again.
 error-last-account = You cannot unlink your only messenger — we would have no way to reach you.
+error-account-not-linked = That messenger is not linked in the first place.
+error-already-blocked = This user is already blocked.
+error-not-blocked = This user is not blocked.
 error-unknown = Something went wrong. We are looking into it.
+
+# Refusals of the buying flow. None of these may carry a placeholder:
+# handle_app_error calls i18n.get(key) with no arguments, and Fluent does not
+# degrade a missing argument into visible text — it raises FluentMessageError.
+# That is not an AppError, so the error handler itself dies and the person gets
+# nothing at all instead of the refusal this message was written for.
+error-check-value = Please check what you entered — that value will not do.
+cart-empty = Your cart is empty — add something before placing an order.
+cart-line-not-found = That line is no longer in your cart. Open the cart again.
+cart-full = There are too many lines in the cart. Remove some, or order in parts.
+cart-not-found = There is no cart yet — add the first product to it.
+cart-repriced = The price changed while you were checking out. Check the total and confirm again.
+cart-line-unavailable = The contents of your cart have changed — please review it.
+quantity-too-small = The quantity has to be at least one.
+quantity-too-large = That many cannot be ordered at once. Lower the quantity or contact a manager.
+money-currency-mismatch = One order cannot mix currencies. Please contact a manager.
+order-empty = The order has no lines at all.
+order-transition-refused = The order is already in another status — that move is not possible.
+order-cannot-cancel = The order has shipped and cannot be cancelled through the bot. Write to a manager.
+order-reason-required = Please give a reason for the cancellation.
+order-not-editable = This order can no longer be edited.
+order-not-found = No such order.
+catalog-product-gone = That product has left the catalog.
+catalog-price-missing = Prices are unavailable right now. We are looking into it — please try later.
+catalog-price-unsupported = Your price list is not supported at the moment. Please contact a manager.
+search-term-too-short = The search term is too short or too long — try another one.
+
+# Buttons five dialogs need at once.
+common-back-button = Back
+common-close-button = Close
+common-cancel-button = Cancel
+common-confirm-button = Confirm
+paging-prev-button = ← Previous
+paging-next-button = Next →
+
+# Badges drawn by the storefront, the cart and the order card alike.
+stock-badge =
+    { $in_stock ->
+        [yes] In stock: { $stock } { $unit }
+       *[no] Made to order
+    }
+price-on-request = Price on request
+
+# Descriptions for the command menu Telegram draws beside the text box. Keys of
+# their own rather than the lines of help-customer cut up: a command
+# description is capped at 256 characters and carries no markup. /manage_orders
+# is deliberately absent — help-staff exists so a customer is never told that
+# staff commands are there.
+command-catalog = Product catalog
+command-search = Search by name or article
+command-cart = Your cart
+command-orders = Your orders
+command-me = Your profile
+command-help = What this bot can do
 
 start-welcome = Hello, { $name }! You are registered.
 start-welcome-back = Welcome back, { $name }!
@@ -16,16 +73,25 @@ start-welcome-back = Welcome back, { $name }!
 help-customer =
     <b>What I can do</b>
 
+    /catalog — browse the catalog
+    /search — search by name or article
+    /cart — your cart
+    /orders — your orders
     /me — my profile
     /help — this help
 help-staff =
     <b>What I can do</b>
 
+    /catalog — browse the catalog
+    /search — search by name or article
+    /cart — your cart
+    /orders — your orders
     /me — my profile
     /help — this help
 
     <b>For staff</b>
     /admin — manage users
+    /manage_orders — the order queue
 
 me-profile =
     <b>{ $name }</b>

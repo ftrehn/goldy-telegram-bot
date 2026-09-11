@@ -26,6 +26,10 @@ from goldy.application.queries.catalog.search_products.query import SearchProduc
 from goldy.presentation.telegram.common import text_keys
 from goldy.presentation.telegram.common.paging import reset_paging
 from goldy.presentation.telegram.common.widgets import I18N_CONTEXT_KEY
+from goldy.presentation.telegram.handlers.catalog.deeplinks import (
+    CATEGORY_ID_KEY,
+    CATEGORY_NAME_KEY,
+)
 from goldy.presentation.telegram.handlers.catalog.getters import (
     ORIGIN_KEY,
     PRODUCTS_PAGE_KEY,
@@ -59,12 +63,22 @@ every card opened before the deploy into a dead button.
 
 
 async def on_dialog_start(start_data: Data, manager: DialogManager) -> None:
-    """Takes over what ``/search`` already worked out before opening the dialog.
+    """Takes over what the caller already worked out before opening the dialog.
 
-    ``/search 40-1234`` resolves the article before the first screen is drawn,
-    so the dialog may open straight on a card. The term travels with it either
-    way, so "back" from that card lands on the results for what was typed
-    rather than at the top of the catalog.
+    Two callers arrive this way. ``/search 40-1234`` resolves the article
+    before the first screen is drawn, so the dialog may open straight on a
+    card; the term travels with it, so "back" from that card lands on the
+    results for what was typed rather than at the top of the catalog. A deep
+    link off the shop's website opens either a card with no term behind it at
+    all, or the tree standing inside the group it named.
+
+    The origin is written only when both a card and a term arrived, and that
+    condition is the whole of the deep link's effect on this function. Set on
+    the card alone, "back" from a card opened by a link would switch to the
+    results screen for the empty search — which the application layer refuses
+    as too short a term, so the only button on that screen would answer with an
+    error. With no origin the card falls back to the categories screen, which
+    is where somebody who arrived from outside wants to go anyway.
     """
     if not isinstance(start_data, dict):
         return
@@ -75,8 +89,33 @@ async def on_dialog_start(start_data: Data, manager: DialogManager) -> None:
         if value is not None:
             manager.dialog_data[key] = value
 
-    if start_data.get(PRODUCT_ID_KEY) is not None:
+    if (
+        start_data.get(TERM_KEY) is not None
+        and start_data.get(PRODUCT_ID_KEY) is not None
+    ):
         manager.dialog_data[ORIGIN_KEY] = RESULTS_ORIGIN
+
+    _stand_in_category(start_data, manager)
+
+
+def _stand_in_category(start_data: Mapping[str, str], manager: DialogManager) -> None:
+    """Puts the group a deep link named on the breadcrumb, as if it were tapped.
+
+    The name comes along with the id rather than being looked up, for the same
+    reason :func:`on_category_selected` takes it off the screen the button was
+    drawn on: the breadcrumb is what the categories screen falls back to when
+    the query cannot supply a heading, and a crumb with no name renders a blank
+    title. Falling back to the id keeps the screen rendering if a link is ever
+    built without one.
+    """
+    category_id = start_data.get(CATEGORY_ID_KEY)
+
+    if category_id is None:
+        return
+
+    category_path(manager).append(
+        [category_id, start_data.get(CATEGORY_NAME_KEY, category_id)],
+    )
 
 
 async def on_category_selected(

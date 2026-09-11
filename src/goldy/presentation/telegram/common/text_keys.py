@@ -225,6 +225,30 @@ CATALOG_SEARCH_EMPTY: Final[str] = "catalog-search-empty"
 CATALOG_SEARCH_AGAIN_BUTTON: Final[str] = "catalog-search-again-button"
 CATALOG_TO_CATALOG_BUTTON: Final[str] = "catalog-to-catalog-button"
 
+# Links from the shop's website that land inside the storefront.
+DEEPLINK_PRODUCT_GONE: Final[str] = "deeplink-product-gone"
+"""What a link that no longer leads to a product says before the catalog opens.
+
+Also what a payload nobody could have minted is answered with, and that is a
+decision rather than an oversight. A link that does not parse names nothing at
+all, so there is no honest way to say *which* kind of thing is missing — and
+the visitor's situation is identical either way: they tapped something on a web
+page and the shop cannot show them what it promised. Two wordings would be
+distinguishing our problem, not theirs.
+
+No placeholder, on purpose. The product cannot be named — either it is gone or
+it was never real — and a message that cannot always fill its arguments is a
+message that sometimes does not render at all.
+"""
+
+DEEPLINK_CATEGORY_GONE: Final[str] = "deeplink-category-gone"
+"""The same for a section, which an import sweep deactivates like any other row.
+
+Separate from the product wording because "try something similar" is advice
+about a product, and a person who followed a link to a whole section is looking
+for a shelf rather than an item.
+"""
+
 # The cart dialog: the cart itself and the confirmation before clearing it.
 CART_TITLE: Final[str] = "cart-title"
 CART_SCREEN_EMPTY: Final[str] = "cart-screen-empty"
@@ -378,6 +402,23 @@ ORDER_CANCELLED_TOAST: Final[str] = "order-cancelled-toast"
 ORDER_EDIT_ADDRESS_BUTTON: Final[str] = "order-edit-address-button"
 ORDER_ADDRESS_PROMPT: Final[str] = "order-address-prompt"
 ORDER_ADDRESS_CHANGED_TOAST: Final[str] = "order-address-changed-toast"
+ORDER_REPEAT_BUTTON: Final[str] = "order-repeat-button"
+ORDER_REPEAT_CONFIRM: Final[str] = "order-repeat-confirm"
+ORDER_REPEAT_PARTIAL: Final[str] = "order-repeat-partial"
+ORDER_REPEAT_NOTHING: Final[str] = "order-repeat-nothing"
+ORDER_REPEAT_DONE_TOAST: Final[str] = "order-repeat-done-toast"
+"""Repeating an order: the button, what it asks, and the three ways it lands.
+
+An order is a snapshot and the catalog moves underneath it, so putting one back
+in the cart has three outcomes rather than one — everything, some of it, or
+none of it — and each needs its own sentence. ``order-repeat-partial`` is the
+interesting one: it is the only place a customer is told that the shop stopped
+selling something they bought before, and a wording that hedged over all three
+cases would say that to somebody whose order copied over perfectly.
+
+The wording of these lives in ``orders.ftl``. The keys live here because a key
+is a contract with the ``.ftl`` files and this module is the only copy of it.
+"""
 
 # The staff queue: a command and a dialog of its own, not a branch of /admin.
 MANAGE_ORDERS_TITLE: Final[str] = "manage-orders-title"

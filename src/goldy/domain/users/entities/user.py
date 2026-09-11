@@ -62,6 +62,12 @@ class User(Aggregate[UserId]):
     exactly one user, and that a messenger account does too. Both span
     aggregates, and any check by reading loses to a concurrent registration, so
     unique indexes hold them and the handler retries on conflict.
+
+    The price list this person is shown prices from is deliberately **not** a
+    field here. It is owned by 1C and keyed by phone number in the catalog
+    projection, with a default configured on the bot; a column here would give
+    the row a second writer — the bot's admin side and the 1C exchange, both
+    writing the same field and racing in silence. See ADR-0003.
     """
 
     phone_number: PhoneNumber
@@ -317,6 +323,12 @@ class User(Aggregate[UserId]):
 
     def ensure_active(self) -> None:
         """Guards anything a blocked person must not do.
+
+        No production caller today: blocking is enforced at the Telegram gate,
+        in ``AuthMiddleware``, which turns a blocked person away before any
+        command is issued. The method stays because the rule belongs to the
+        aggregate — a second front end, or a command reachable without a
+        messenger update, would have nothing else to ask.
 
         Raises:
             UserIsBlockedError: they are blocked.

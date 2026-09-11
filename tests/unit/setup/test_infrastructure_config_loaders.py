@@ -11,6 +11,7 @@ from dature.errors.exceptions import DatureConfigError
 
 from goldy.setup.bootstrap.loaders.admin_config_loader import AdminConfigLoader
 from goldy.setup.bootstrap.loaders.alchemy_config_loader import SQLAlchemyConfigLoader
+from goldy.setup.bootstrap.loaders.catalog_config_loader import CatalogConfigLoader
 from goldy.setup.bootstrap.loaders.postgres_config_loader import PostgresConfigLoader
 from goldy.setup.bootstrap.loaders.rabbitmq_config_loader import RabbitMQConfigLoader
 from goldy.setup.bootstrap.loaders.redis_config_loader import RedisConfigLoader
@@ -18,6 +19,7 @@ from goldy.setup.bootstrap.loaders.taskiq_config_loader import TaskIQConfigLoade
 from goldy.setup.bootstrap.loaders.telegram_config_loader import TelegramConfigLoader
 from tests.unit.factories.source_stubs import (
     admin_source_stub,
+    catalog_source_stub,
     postgres_source_stub,
     rabbitmq_source_stub,
     redis_source_stub,
@@ -272,6 +274,25 @@ def test_admin_numbers_are_rejected_when_one_of_them_is_nonsense() -> None:
         loader.load()
 
     assert "GOLDY_ADMIN_PHONE_NUMBERS" in render_exception(excinfo.value)
+
+
+def test_the_default_price_type_is_read_as_the_identifier_it_is() -> None:
+    config = CatalogConfigLoader(catalog_source_stub()).load()
+
+    assert config.default_price_type_id == "1c-price-type-wholesale"
+
+
+@pytest.mark.parametrize("value", ("", "   "))
+def test_a_shop_without_a_default_price_type_refuses_to_start(value: str) -> None:
+    """Empty, this setting hands every customer without a binding no prices."""
+    stub = catalog_source_stub(GOLDY_DEFAULT_PRICE_TYPE_ID=value)
+
+    loader = CatalogConfigLoader(stub)
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "GOLDY_DEFAULT_PRICE_TYPE_ID" in render_exception(excinfo.value)
 
 
 def test_sqlalchemy_optional_fields_fall_back_to_their_defaults() -> None:

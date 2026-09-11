@@ -82,15 +82,22 @@ def setup_task_manager_middlewares(
 
 
 def setup_event_broker(rabbitmq_config: RabbitMQConfig) -> RabbitBroker:
-    """FastStream's connection, used by the relay to publish domain events.
+    """FastStream's connection to the domain event exchange.
 
     Separate from taskiq's: taskiq owns a work queue whose messages are
     consumed competitively, while domain events go to a topic exchange that any
     number of consumers can bind to independently.
 
-    Only ever a publisher here — goldy subscribes to nothing — so it is created
-    and handed to the container rather than being given a FastStream app and a
-    lifespan of its own.
+    Both a publisher and a consumer since the notifier was built. The relay
+    publishes to the exchange on its cron tick and the notification subscribers
+    bind to it, which is why the worker *starts* this broker rather than only
+    connecting it — connecting opens the channel, starting is what makes a
+    registered subscriber actually consume.
+
+    Still created here and handed to the container rather than given a
+    FastStream app and a lifespan of its own: the worker process already has
+    one lifecycle, taskiq's, and a second one would give the two different
+    ideas about when shutdown happened.
     """
     return RabbitBroker(url=rabbitmq_config.uri)
 

@@ -5,7 +5,12 @@ from dishka import AsyncContainer, Provider, make_async_container
 from dishka.integrations.taskiq import TaskiqProvider
 
 from goldy.setup.ioc.containers.common import common_providers
-from goldy.setup.ioc.providers import outbox_handlers_provider, task_manager_provider
+from goldy.setup.ioc.providers import (
+    notification_handlers_provider,
+    notifications_provider,
+    outbox_handlers_provider,
+    task_manager_provider,
+)
 
 
 def worker_providers() -> Iterable[Provider]:
@@ -15,11 +20,18 @@ def worker_providers() -> Iterable[Provider]:
     nobody's request. A handler that needed one would fail to resolve at
     startup rather than halfway through a task, which is the whole reason the
     containers are assembled separately.
+
+    The notification groups are the mirror image of that rule. They carry the
+    Bot API client and the token behind it, and only this process gets them:
+    the bot answers the person who wrote to it, while the worker writes to
+    people who did not.
     """
     return (
         *common_providers(),
         task_manager_provider(),
         outbox_handlers_provider(),
+        notifications_provider(),
+        notification_handlers_provider(),
         TaskiqProvider(),
     )
 

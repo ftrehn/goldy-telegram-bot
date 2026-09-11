@@ -24,6 +24,8 @@ from goldy.application.commands.carts.remove_unavailable_cart_lines.command impo
 from goldy.application.commands.carts.remove_unavailable_cart_lines.handler import (
     RemoveUnavailableCartLinesHandler,
 )
+from goldy.application.commands.carts.repeat_order.command import RepeatOrderCommand
+from goldy.application.commands.carts.repeat_order.handler import RepeatOrderHandler
 from goldy.application.commands.carts.set_cart_line_quantity.command import (
     SetCartLineQuantityCommand,
 )
@@ -219,6 +221,7 @@ def make_registry() -> Registry:
         RemoveUnavailableCartLinesHandler,
     )
     registry.add_request_handler(ClearCartCommand, ClearCartHandler)
+    registry.add_request_handler(RepeatOrderCommand, RepeatOrderHandler)
 
     registry.add_request_handler(PlaceOrderCommand, PlaceOrderHandler)
     registry.add_request_handler(CancelOrderCommand, CancelOrderHandler)

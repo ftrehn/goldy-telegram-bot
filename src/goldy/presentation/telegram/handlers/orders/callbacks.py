@@ -8,6 +8,7 @@ from aiogram_i18n import I18nContext
 from dishka import FromDishka
 from dishka.integrations.aiogram_dialog import inject
 
+from goldy.application.commands.carts.repeat_order.command import RepeatOrderCommand
 from goldy.application.commands.orders.cancel_order.command import CancelOrderCommand
 from goldy.application.commands.orders.change_delivery_address.command import (
     ChangeDeliveryAddressCommand,
@@ -17,6 +18,8 @@ from goldy.presentation.telegram.common import text_keys
 from goldy.presentation.telegram.common.widgets import I18N_CONTEXT_KEY
 from goldy.presentation.telegram.handlers.orders.getters import (
     ORDER_ID_KEY,
+    REPEAT_MOVED_KEY,
+    REPEAT_SKIPPED_KEY,
     selected_order_id,
 )
 from goldy.presentation.telegram.handlers.orders.states import OrdersStates
@@ -105,6 +108,43 @@ async def on_cancel_confirmed(
 
     await callback.answer(i18n.get(text_keys.ORDER_CANCELLED_TOAST))
     await manager.switch_to(OrdersStates.CARD)
+
+
+@inject
+async def on_repeat_confirmed(
+    callback: CallbackQuery,
+    _widget: Button,
+    manager: DialogManager,
+    sender: FromDishka[Sender],
+) -> None:
+    """Fills the cart from the order, and says what could not be put in it.
+
+    A toast is the whole answer when everything moved: the news is one sentence
+    and the person is looking at the button that produced it. Anything else
+    needs a screen, because the list of what was left out is as long as the
+    order and Telegram cuts a toast at two hundred characters without saying so.
+
+    The two numbers are handed to that screen through ``dialog_data`` rather
+    than re-read from the cart. They describe what this press did, and a screen
+    that re-read the cart would report whatever it has become since — including
+    the work of a second window the same person has open.
+
+    A partial repeat is *not* also toasted. Two notifications about one press,
+    one of them covering the other, is how a person misses the half that
+    mattered.
+    """
+    i18n: I18nContext = manager.middleware_data[I18N_CONTEXT_KEY]
+
+    view = await sender.send(RepeatOrderCommand(order_id=selected_order_id(manager)))
+
+    if view.moved_everything:
+        await callback.answer(i18n.get(text_keys.ORDER_REPEAT_DONE_TOAST))
+        await manager.switch_to(OrdersStates.CARD)
+        return
+
+    manager.dialog_data[REPEAT_MOVED_KEY] = view.moved_line_count
+    manager.dialog_data[REPEAT_SKIPPED_KEY] = list(view.skipped_product_names)
+    await manager.switch_to(OrdersStates.REPEAT_RESULT)
 
 
 async def on_close(

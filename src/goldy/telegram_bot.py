@@ -16,6 +16,7 @@ from goldy.setup.bootstrap.setups.configs_setup import (
 )
 from goldy.setup.bootstrap.setups.database_setup import setup_map_tables
 from goldy.setup.bootstrap.setups.logging_setup import configure_logging
+from goldy.setup.bootstrap.setups.telegram_session_setup import make_telegram_session
 from goldy.setup.bootstrap.setups.telegram_setup import (
     setup_bot_commands,
     setup_telegram_bot_dispatcher,
@@ -58,6 +59,7 @@ async def create_bot() -> None:
 
     bot = Bot(
         token=telegram_config.bot_token,
+        session=make_telegram_session(telegram_config.proxy_url),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 

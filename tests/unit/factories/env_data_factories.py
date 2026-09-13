@@ -58,7 +58,12 @@ def rabbitmq_env(**overrides: str) -> dict[str, str]:
 
 
 def telegram_env(**overrides: str) -> dict[str, str]:
-    """Valid ``TELEGRAM_*`` values; override any key."""
+    """Valid ``TELEGRAM_*`` values; override any key.
+
+    The proxy is present and empty, which is how a compose file spells "not
+    set" — the loader reads it as ``None``, and a test that wants a proxy
+    overrides it with a URL.
+    """
     return {
         "TELEGRAM_BOT_TOKEN": "123456789:AAFakeTokenForTestsOnly",
         "TELEGRAM_USE_REDIS_STORAGE": "true",
@@ -67,6 +72,7 @@ def telegram_env(**overrides: str) -> dict[str, str]:
         "TELEGRAM_DEFAULT_LOCALE": "ru",
         "TELEGRAM_DROP_PENDING_UPDATES": "true",
         "TELEGRAM_FSM_TTL_SECONDS": "604800",
+        "TELEGRAM_PROXY_URL": "",
     } | overrides
 
 

@@ -4,6 +4,10 @@ from dature import V, load
 
 from goldy.domain.users.values.locale import SUPPORTED_LOCALES
 from goldy.setup.bootstrap.loaders.loader import ConfigLoader
+from goldy.setup.bootstrap.loaders.telegram_proxy_url import (
+    TELEGRAM_PROXY_URL_ERROR,
+    is_telegram_proxy_url,
+)
 from goldy.setup.configs.telegram_config import TelegramConfig
 
 if TYPE_CHECKING:
@@ -15,7 +19,11 @@ if TYPE_CHECKING:
 
 
 class TelegramConfigLoader(ConfigLoader[TelegramConfig]):
-    """``dature``-backed loader for :class:`TelegramConfig`."""
+    """``dature``-backed loader for :class:`TelegramConfig`.
+
+    The proxy URL is a secret field alongside the token: the password to the
+    proxy lives inside it, and a startup failure is a log.
+    """
 
     def __init__(self, source_factory: SourceFactory) -> None:
         self._source_factory: Final[SourceFactory] = source_factory
@@ -26,7 +34,7 @@ class TelegramConfigLoader(ConfigLoader[TelegramConfig]):
             self._source_factory.create(),
             schema=TelegramConfig,
             root_validators=self._root_validators(),
-            secret_field_names=("bot_token",),
+            secret_field_names=("bot_token", "proxy_url"),
         )
 
     @staticmethod
@@ -46,5 +54,9 @@ class TelegramConfigLoader(ConfigLoader[TelegramConfig]):
             V.root(
                 lambda c: c.fsm_ttl_seconds > 0,
                 error_message="TELEGRAM_FSM_TTL_SECONDS must be a positive number",
+            ),
+            V.root(
+                lambda c: is_telegram_proxy_url(c.proxy_url),
+                error_message=TELEGRAM_PROXY_URL_ERROR,
             ),
         )

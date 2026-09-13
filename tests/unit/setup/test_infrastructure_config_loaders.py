@@ -17,6 +17,10 @@ from goldy.setup.bootstrap.loaders.rabbitmq_config_loader import RabbitMQConfigL
 from goldy.setup.bootstrap.loaders.redis_config_loader import RedisConfigLoader
 from goldy.setup.bootstrap.loaders.taskiq_config_loader import TaskIQConfigLoader
 from goldy.setup.bootstrap.loaders.telegram_config_loader import TelegramConfigLoader
+from goldy.setup.bootstrap.sources.telegram_env_source_factory import (
+    TelegramEnvSourceFactory,
+)
+from tests.unit.factories.env_data_factories import telegram_env
 from tests.unit.factories.source_stubs import (
     admin_source_stub,
     catalog_source_stub,
@@ -27,6 +31,7 @@ from tests.unit.factories.source_stubs import (
     taskiq_source_stub,
     telegram_source_stub,
 )
+from tests.unit.factories.stub_source_factory import StubSourceFactory
 from tests.unit.support import render_exception
 
 
@@ -267,6 +272,80 @@ def test_telegram_rejects_a_default_locale_we_do_not_ship() -> None:
         loader.load()
 
     assert "TELEGRAM_DEFAULT_LOCALE" in render_exception(excinfo.value)
+
+
+def test_telegram_talks_directly_when_the_proxy_variable_is_absent() -> None:
+    without_proxy = {
+        name: value
+        for name, value in telegram_env().items()
+        if name != "TELEGRAM_PROXY_URL"
+    }
+    stub = StubSourceFactory.mirroring(TelegramEnvSourceFactory(), without_proxy)
+
+    config = TelegramConfigLoader(stub).load()
+
+    assert config.proxy_url is None
+
+
+def test_telegram_talks_directly_when_the_proxy_variable_is_empty() -> None:
+    """A compose file spells "no proxy" as ``TELEGRAM_PROXY_URL=``, not as a URL."""
+    config = TelegramConfigLoader(telegram_source_stub(TELEGRAM_PROXY_URL="")).load()
+
+    assert config.proxy_url is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    (
+        "socks5://user:pass@proxy.internal:1080",
+        "socks5://proxy.internal:1080",
+        "socks4://10.0.0.1:1080",
+        "http://user:pass@proxy.internal:3128",
+    ),
+)
+def test_telegram_keeps_a_proxy_url_of_an_accepted_shape(url: str) -> None:
+    config = TelegramConfigLoader(telegram_source_stub(TELEGRAM_PROXY_URL=url)).load()
+
+    assert config.proxy_url == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    (
+        "proxy.internal:1080",
+        "https://proxy.internal:3128",
+        "socks5h://proxy.internal:1080",
+        "socks5://user:pass@:1080",
+        "socks5://proxy.internal",
+        "socks5://proxy.internal:port",
+        "   ",
+    ),
+)
+def test_telegram_rejects_a_proxy_url_the_session_could_not_be_built_on(
+    url: str,
+) -> None:
+    """The library refuses these in the session constructor, naming nothing of ours."""
+    loader = TelegramConfigLoader(telegram_source_stub(TELEGRAM_PROXY_URL=url))
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "TELEGRAM_PROXY_URL" in render_exception(excinfo.value)
+
+
+def test_telegram_proxy_password_is_masked_in_error_output() -> None:
+    """The proxy's password lives inside the URL, and a startup failure is a log."""
+    stub = telegram_source_stub(
+        TELEGRAM_PROXY_URL="socks5://user:TOP-SECRET-VALUE@proxy.internal:1080",
+        TELEGRAM_DEFAULT_LOCALE="de",
+    )
+
+    loader = TelegramConfigLoader(stub)
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "TOP-SECRET-VALUE" not in render_exception(excinfo.value)
 
 
 def test_no_configured_admins_is_a_valid_configuration() -> None:

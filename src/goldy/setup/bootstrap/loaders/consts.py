@@ -24,3 +24,11 @@ TEMPERATURE_MAX: Final[float] = 2.0
 RECEIVER_TOKEN_MIN_LENGTH: Final[int] = 32
 """Short enough to type into a 1C constant, long enough that guessing is not a plan."""
 RECEIVER_MAX_BODY_MIB_MIN: Final[int] = 1
+
+TELEGRAM_PROXY_SCHEMES: Final[frozenset[str]] = frozenset({"http", "socks4", "socks5"})
+"""The schemes ``aiohttp-socks`` parses — what aiogram's session hands a proxy URL to.
+
+``https://`` and ``socks5h://`` are not among them: the library refuses both
+with a ``ValueError`` at session construction, which the loader turns into a
+startup error naming the variable instead.
+"""

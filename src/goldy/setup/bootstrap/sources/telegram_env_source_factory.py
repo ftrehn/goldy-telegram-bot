@@ -24,5 +24,6 @@ class TelegramEnvSourceFactory(SourceFactory):
                 F[TelegramConfig].use_i18n_isolation: "TELEGRAM_USE_I18N_ISOLATION",
                 F[TelegramConfig].default_locale: "TELEGRAM_DEFAULT_LOCALE",
                 F[TelegramConfig].drop_pending_updates: "TELEGRAM_DROP_PENDING_UPDATES",
+                F[TelegramConfig].fsm_ttl_seconds: "TELEGRAM_FSM_TTL_SECONDS",
             },
         )

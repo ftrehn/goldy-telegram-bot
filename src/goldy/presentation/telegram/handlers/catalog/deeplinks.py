@@ -51,9 +51,16 @@ class CatalogEntry:
     A value rather than a pair of side effects, so that "a withdrawn product
     sends you to the catalog with an apology" is a fact a test can read off a
     return value — no dialog manager, no bot, no Telegram.
+
+    The state defaults to the top of the catalog, because that is where every
+    link that leads nowhere ends up: such an entry is spelled by its notice
+    alone, and only an entry that found what it was looking for names a
+    screen. Through a factory rather than as a plain default, because a
+    ``State`` assigned in a class body is a descriptor aiogram tries to bind
+    to a ``StatesGroup``.
     """
 
-    state: State
+    state: State = field(default_factory=lambda: CatalogStates.CATEGORIES)
     data: dict[str, str] = field(default_factory=dict)
     notice: str | None = None
 
@@ -72,7 +79,7 @@ async def resolve_deeplink(
     would also be true.
     """
     if target is None:
-        return _gone(text_keys.DEEPLINK_PRODUCT_GONE)
+        return CatalogEntry(notice=text_keys.DEEPLINK_PRODUCT_GONE)
 
     if target.kind is DeepLinkKind.PRODUCT:
         return await _product_entry(sender, target.id)
@@ -99,10 +106,10 @@ async def _product_entry(sender: Sender, product_id: str) -> CatalogEntry:
     try:
         view = await sender.send(GetProductQuery(product_id=product_id))
     except ProductNotFoundError:
-        return _gone(text_keys.DEEPLINK_PRODUCT_GONE)
+        return CatalogEntry(notice=text_keys.DEEPLINK_PRODUCT_GONE)
 
     if not view.is_active:
-        return _gone(text_keys.DEEPLINK_PRODUCT_GONE)
+        return CatalogEntry(notice=text_keys.DEEPLINK_PRODUCT_GONE)
 
     return CatalogEntry(state=CatalogStates.CARD, data={PRODUCT_ID_KEY: view.id})
 
@@ -121,14 +128,9 @@ async def _category_entry(sender: Sender, category_id: str) -> CatalogEntry:
     view = await sender.send(ListCategoriesQuery(parent_id=category_id))
 
     if view.parent is None:
-        return _gone(text_keys.DEEPLINK_CATEGORY_GONE)
+        return CatalogEntry(notice=text_keys.DEEPLINK_CATEGORY_GONE)
 
     return CatalogEntry(
         state=CatalogStates.CATEGORIES,
         data={CATEGORY_ID_KEY: view.parent.id, CATEGORY_NAME_KEY: view.parent.name},
     )
-
-
-def _gone(notice: str) -> CatalogEntry:
-    """The catalog from the top, with a sentence explaining why you are there."""
-    return CatalogEntry(state=CatalogStates.CATEGORIES, notice=notice)

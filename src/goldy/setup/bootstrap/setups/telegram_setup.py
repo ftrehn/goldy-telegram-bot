@@ -56,6 +56,13 @@ def setup_telegram_bot_storage(
     Memory storage is for running the bot with nothing but a token: it loses
     every conversation on restart, which is fine locally and unacceptable in
     production, where a deploy would drop everyone mid-order.
+
+    Redis keys expire. Everything a dialogue keeps between updates — its
+    state, its ``dialog_data``, a deep link waiting for a registration to
+    finish — lives here and nowhere else, and a store that never forgot would
+    hold every conversation anybody ever walked away from. The TTL is one
+    setting for both the state and the data, because a state without its data
+    is a screen that cannot render and data without its state is unreachable.
     """
     if not telegram_config.use_redis_storage:
         logger.warning("telegram: using memory storage — dialogues die on restart")
@@ -64,6 +71,8 @@ def setup_telegram_bot_storage(
     return RedisStorage.from_url(
         url=redis_config.fsm_uri,
         key_builder=DefaultKeyBuilder(with_bot_id=True, with_destiny=True),
+        state_ttl=telegram_config.fsm_ttl_seconds,
+        data_ttl=telegram_config.fsm_ttl_seconds,
     )
 
 

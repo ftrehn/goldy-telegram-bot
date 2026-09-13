@@ -220,6 +220,18 @@ def test_telegram_loads_its_storage_flags() -> None:
     assert config.use_redis_storage is True
     assert config.use_redis_event_isolation is True
     assert config.default_locale == "ru"
+    assert config.fsm_ttl_seconds == 7 * 24 * 60 * 60
+
+
+@pytest.mark.parametrize("ttl", ("0", "-5"))
+def test_telegram_rejects_a_dialogue_lifetime_of_nothing(ttl: str) -> None:
+    """A zero TTL would expire every dialogue between two taps."""
+    loader = TelegramConfigLoader(telegram_source_stub(TELEGRAM_FSM_TTL_SECONDS=ttl))
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "TELEGRAM_FSM_TTL_SECONDS" in render_exception(excinfo.value)
 
 
 @pytest.mark.parametrize("token", ("", "   ", "no-colon-here"))

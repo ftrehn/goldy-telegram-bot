@@ -45,6 +45,12 @@ FSM data is stored as JSON, and a payload is already a string in an alphabet
 chosen to survive being copied through anything. Keeping the decoded pair
 instead would mean a shape to migrate the first time a kind is added, for a
 value the payload rebuilds in microseconds.
+
+It waits in the dispatcher's FSM storage, which in every deployment but a
+developer's laptop is Redis with a TTL (``TELEGRAM_FSM_TTL_SECONDS``): the
+link survives a restart of the bot, and a registration nobody finished does
+not keep it forever. Memory storage loses it with the process, and that is
+the documented price of running with nothing but a token.
 """
 
 STATE_KEY: Final[str] = "state"

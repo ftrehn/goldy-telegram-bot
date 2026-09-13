@@ -61,6 +61,11 @@ class SqlAlchemyOrderRowViewMapper(OrderRowViewMapper):
             recipient_phone_number=row["recipient_phone"].value,
             comment=comment.value if comment is not None else None,
             cancelled_by=cancelled_by.value if cancelled_by is not None else None,
+            cancelled_by_user_id=row["cancelled_by_user_id"],
+            cancelled_by_name=_full_name(
+                row["canceller_first_name"],
+                row["canceller_last_name"],
+            ),
             cancellation_reason=(
                 cancellation_reason.value if cancellation_reason is not None else None
             ),
@@ -83,7 +88,6 @@ class SqlAlchemyOrderRowViewMapper(OrderRowViewMapper):
         else is what was agreed at checkout and is never looked up through
         ``product_id``.
         """
-        sku = row["sku"]
         quantity = row["quantity"].value
         amount = row["unit_price_amount"]
         currency = row["unit_price_currency"].value
@@ -91,7 +95,7 @@ class SqlAlchemyOrderRowViewMapper(OrderRowViewMapper):
         return OrderLineView(
             position=row["position"],
             product_id=row["product_id"].value,
-            sku=sku.value if sku is not None else None,
+            sku=row["sku"].value,
             name=row["name"].value,
             unit_name=row["unit_name"],
             quantity=quantity,
@@ -126,6 +130,14 @@ class SqlAlchemyOrderRowViewMapper(OrderRowViewMapper):
             line_count=row["line_count"],
             created_at=row["created_at"],
         )
+
+
+def _full_name(first_name: str | None, last_name: str | None) -> str | None:
+    """The name of the joined account, or nothing when the outer join found none."""
+    if first_name is None:
+        return None
+
+    return first_name if last_name is None else f"{first_name} {last_name}"
 
 
 def _total_of(lines: Sequence[OrderLineView]) -> MoneyView:

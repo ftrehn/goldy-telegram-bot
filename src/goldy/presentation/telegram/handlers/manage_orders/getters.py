@@ -30,6 +30,9 @@ from goldy.presentation.telegram.common.order_cards import (
 )
 from goldy.presentation.telegram.common.paging import page_request, paging_data
 
+QUEUE_SCROLL_ID: Final[str] = "queue_scroll"
+
+
 ORDER_ID_KEY: Final[str] = "order_id"
 
 STATUS_FILTER_KEY: Final[str] = "status_filter"
@@ -75,7 +78,7 @@ async def queue_getter(
     all. The router's staff filter is not what keeps a buyer out of here — it
     only keeps them from learning that the command exists.
     """
-    limit, offset = page_request(dialog_manager)
+    limit, offset = await page_request(dialog_manager, scroll_id=QUEUE_SCROLL_ID)
     status = selected_filter(dialog_manager)
     view = await sender.send(
         ListOrdersQuery(limit=limit, offset=offset, status=status),
@@ -85,7 +88,11 @@ async def queue_getter(
         "orders": [(_row(i18n, order), str(order.id)) for order in view.orders],
         "is_empty": not view.orders,
         "filter": _filter_label(i18n, status),
-        **paging_data(dialog_manager, total=view.total),
+        **await paging_data(
+            dialog_manager,
+            scroll_id=QUEUE_SCROLL_ID,
+            total=view.total,
+        ),
     }
 
 

@@ -8,9 +8,9 @@ from goldy.application.common.ports.carts import (
     CartQueryGateway,
 )
 from goldy.application.common.ports.catalog import (
-    CatalogProjectionGateway,
+    CatalogProjectionDao,
     CatalogQueryGateway,
-    PricingGateway,
+    PricingReader,
 )
 from goldy.application.common.ports.orders import (
     OrderCommandGateway,
@@ -32,14 +32,14 @@ from goldy.infrastructure.adapters.outbox.outbox_event_bus import OutboxEventBus
 from goldy.infrastructure.adapters.outbox.retort_event_serializer import (
     RetortEventSerializer,
 )
-from goldy.infrastructure.adapters.persistence import (
-    sqlalchemy_catalog_projection_gateway as projection_adapter,
-)
 from goldy.infrastructure.adapters.persistence.sqlalchemy_cart_command_gateway import (
     SqlAlchemyCartCommandGateway,
 )
 from goldy.infrastructure.adapters.persistence.sqlalchemy_cart_query_gateway import (
     SqlAlchemyCartQueryGateway,
+)
+from goldy.infrastructure.adapters.persistence.sqlalchemy_catalog_projection_dao import (
+    SqlAlchemyCatalogProjectionDao,
 )
 from goldy.infrastructure.adapters.persistence.sqlalchemy_catalog_query_gateway import (
     SqlAlchemyCatalogQueryGateway,
@@ -53,8 +53,8 @@ from goldy.infrastructure.adapters.persistence.sqlalchemy_order_query_gateway im
 from goldy.infrastructure.adapters.persistence.sqlalchemy_outbox_command_gateway import (
     SqlAlchemyOutboxRepository,
 )
-from goldy.infrastructure.adapters.persistence.sqlalchemy_pricing_gateway import (
-    SqlAlchemyPricingGateway,
+from goldy.infrastructure.adapters.persistence.sqlalchemy_pricing_reader import (
+    SqlAlchemyPricingReader,
 )
 from goldy.infrastructure.adapters.persistence.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
@@ -83,7 +83,7 @@ def make_default_price_type_id(catalog_config: CatalogConfig) -> PriceTypeId:
     """Parses the configured price list once, at startup.
 
     Two collaborators need this one value and neither may read the setting
-    itself: ``SqlAlchemyPricingGateway`` substitutes it for a customer the
+    itself: ``SqlAlchemyPricingReader`` substitutes it for a customer the
     catalog holds no binding for, and ``FinalizeCatalogImportHandler`` refuses
     a sweep that would leave the shop without it. Infrastructure must not
     import ``setup``, and the application layer must not either, so the
@@ -111,10 +111,6 @@ def gateways_provider() -> Provider:
     handlers above them do that - so there is nothing about them a worker must
     be prevented from resolving, and a second place to look would only make a
     failed resolution harder to trace.
-
-    The projection adapter is the one reached through its module rather than by
-    name: its fully qualified import runs past the line limit, and a module
-    alias is preferable to a ``noqa`` that would then be copied.
     """
     provider: Final[Provider] = Provider(scope=Scope.REQUEST)
 
@@ -127,11 +123,8 @@ def gateways_provider() -> Provider:
     provider.provide(source=OutboxEventBus, provides=EventBus)
 
     provider.provide(source=SqlAlchemyCatalogQueryGateway, provides=CatalogQueryGateway)
-    provider.provide(source=SqlAlchemyPricingGateway, provides=PricingGateway)
-    provider.provide(
-        source=projection_adapter.SqlAlchemyCatalogProjectionGateway,
-        provides=CatalogProjectionGateway,
-    )
+    provider.provide(source=SqlAlchemyPricingReader, provides=PricingReader)
+    provider.provide(source=SqlAlchemyCatalogProjectionDao, provides=CatalogProjectionDao)
 
     provider.provide(source=SqlAlchemyCartCommandGateway, provides=CartCommandGateway)
     provider.provide(source=SqlAlchemyCartQueryGateway, provides=CartQueryGateway)

@@ -13,7 +13,7 @@ is — ``_index_of`` reads the number back out when a helper has a line and need
 to price it.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
 from typing import Final
 from uuid import UUID
@@ -53,7 +53,7 @@ from tests.unit.factories.domain_factories import (
 
 CART_ID: str = "aaaaaaaa-1111-1111-1111-111111111111"
 ORDER_ID: str = "bbbbbbbb-1111-1111-1111-111111111111"
-ORDER_NUMBER: str = "1001"
+ORDER_NUMBER: str = "240913-3K7QXA"
 PRODUCT_ID_PREFIX: str = "1c-product-"
 PRICE_TYPE_ID: str = "1c-price-type-wholesale"
 UNIT_SOURCE_ID: str = "1c-unit-796"
@@ -128,17 +128,11 @@ def make_priced_product(
     currency: Currency = Currency.RUB,
     name: str | None = None,
     unit: UnitOfMeasure | None = None,
-    *,
-    with_sku: bool = True,
 ) -> PricedProduct:
-    """A priced product numbered ``index``, articled ``SKU-<index>``.
-
-    ``with_sku=False`` is how a test asks for a product 1C never gave an
-    article to, which is an ordinary product and not a broken one.
-    """
+    """A priced product numbered ``index``, articled ``SKU-<index>``."""
     return PricedProduct(
         product_id=make_product_id(index),
-        sku=Sku(value=f"SKU-{index}") if with_sku else None,
+        sku=Sku(value=f"SKU-{index}"),
         name=ProductName(value=name if name is not None else f"Товар {index}"),
         unit=unit if unit is not None else make_unit(),
         unit_price=make_money(price, currency),
@@ -162,7 +156,7 @@ def make_cart(
     return cart
 
 
-def price_everything_in(cart: Cart) -> tuple[PricedProduct, ...]:
+def price_everything_in(cart: Cart) -> Sequence[PricedProduct]:
     """Prices every line of a cart, which is what checkout normally gets."""
     return tuple(
         make_priced_product(index=_index_of(line.product_id)) for line in cart.lines
@@ -175,15 +169,8 @@ def make_order_line(
     quantity: int = 1,
     price: str = UNIT_PRICE,
     currency: Currency = Currency.RUB,
-    *,
-    with_sku: bool = True,
 ) -> OrderLine:
-    priced = make_priced_product(
-        index=index,
-        price=price,
-        currency=currency,
-        with_sku=with_sku,
-    )
+    priced = make_priced_product(index=index, price=price, currency=currency)
     return OrderLine(
         position=position,
         product_id=priced.product_id,
@@ -196,7 +183,7 @@ def make_order_line(
 
 
 def make_placement(
-    lines: tuple[OrderLine, ...] | None = None,
+    lines: Sequence[OrderLine] | None = None,
     customer_id: UserId | None = None,
     price_type_id: str = PRICE_TYPE_ID,
     comment: str | None = None,
@@ -213,7 +200,7 @@ def make_placement(
 
 def make_checkout(
     cart: Cart,
-    priced_products: tuple[PricedProduct, ...] | None = None,
+    priced_products: Sequence[PricedProduct] | None = None,
     price_type_id: str = PRICE_TYPE_ID,
     comment: str | None = None,
     delivery_address: str = DELIVERY_ADDRESS,
@@ -232,7 +219,7 @@ def make_checkout(
 
 def make_order(
     status: OrderStatus = OrderStatus.NEW,
-    lines: tuple[OrderLine, ...] | None = None,
+    lines: Sequence[OrderLine] | None = None,
     customer_id: UserId | None = None,
     price_type_id: str = PRICE_TYPE_ID,
     events_collection: EventsCollection | None = None,
@@ -248,7 +235,6 @@ def make_order(
     )
     order = Order.place(
         order_id=make_order_id(),
-        order_number=make_order_number(),
         events_collection=collection,
         placement=make_placement(
             lines=lines,
@@ -294,7 +280,10 @@ _LIFECYCLE: Final[tuple[OrderStatus, ...]] = (
 
 def _drive_to(order: Order, status: OrderStatus) -> None:
     if status is OrderStatus.CANCELLED:
-        order.cancel(initiated_by=CancellationInitiator.CUSTOMER)
+        order.cancel(
+            initiated_by=CancellationInitiator.CUSTOMER,
+            cancelled_by_user_id=order.customer_id,
+        )
         return
 
     for step in _LIFECYCLE[1 : _LIFECYCLE.index(status) + 1]:

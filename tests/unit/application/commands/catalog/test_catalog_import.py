@@ -18,11 +18,11 @@ from tests.unit.factories.catalog_factories import (
     make_stock_row,
 )
 from tests.unit.factories.shop_factories import PRICE_TYPE_ID
-from tests.unit.stubs.catalog import RecordingCatalogProjectionGateway
+from tests.unit.stubs.catalog import RecordingCatalogProjectionDao
 
 
 async def test_a_batch_writes_every_kind_it_carries_under_one_mark(
-    projection_gateway: RecordingCatalogProjectionGateway,
+    projection_dao: RecordingCatalogProjectionDao,
     import_catalog_handler: ImportCatalogHandler,
 ) -> None:
     """A batch is whatever its sender put in it.
@@ -42,11 +42,11 @@ async def test_a_batch_writes_every_kind_it_carries_under_one_mark(
     response = await import_catalog_handler.handle(ImportCatalogCommand(snapshot))
 
     assert response.accepted == 6
-    assert set(projection_gateway.batch_ids) == {BATCH_ID}
+    assert set(projection_dao.batch_ids) == {BATCH_ID}
 
 
 async def test_an_empty_batch_writes_nothing_at_all(
-    projection_gateway: RecordingCatalogProjectionGateway,
+    projection_dao: RecordingCatalogProjectionDao,
     import_catalog_handler: ImportCatalogHandler,
 ) -> None:
     """Mentioning nothing is not the same as emptying something.
@@ -58,11 +58,11 @@ async def test_an_empty_batch_writes_nothing_at_all(
     )
 
     assert response.accepted == 0
-    assert projection_gateway.batch_ids == []
+    assert projection_dao.batch_ids == []
 
 
 async def test_a_price_of_zero_never_reaches_a_storefront(
-    projection_gateway: RecordingCatalogProjectionGateway,
+    projection_dao: RecordingCatalogProjectionDao,
     import_catalog_handler: ImportCatalogHandler,
 ) -> None:
     """Zero reads as "free" on a screen.
@@ -78,13 +78,13 @@ async def test_a_price_of_zero_never_reaches_a_storefront(
 
     assert response.accepted == 1
     assert response.discarded == 1
-    assert [price.product_id for price in projection_gateway.prices] == [
+    assert [price.product_id for price in projection_dao.prices] == [
         make_price_row(2).product_id,
     ]
 
 
 async def test_a_price_in_an_unknown_currency_is_discarded_rather_than_shown(
-    projection_gateway: RecordingCatalogProjectionGateway,
+    projection_dao: RecordingCatalogProjectionDao,
     import_catalog_handler: ImportCatalogHandler,
 ) -> None:
     """Storing it would mean printing somebody's yuan as roubles."""
@@ -96,11 +96,11 @@ async def test_a_price_in_an_unknown_currency_is_discarded_rather_than_shown(
     response = await import_catalog_handler.handle(ImportCatalogCommand(snapshot))
 
     assert response.discarded == 1
-    assert projection_gateway.prices == []
+    assert projection_dao.prices == []
 
 
 async def test_a_currency_1c_spelled_in_capitals_is_still_our_currency(
-    projection_gateway: RecordingCatalogProjectionGateway,
+    projection_dao: RecordingCatalogProjectionDao,
     import_catalog_handler: ImportCatalogHandler,
 ) -> None:
     """The exchange writes the code as 1C has it.
@@ -115,7 +115,7 @@ async def test_a_currency_1c_spelled_in_capitals_is_still_our_currency(
     response = await import_catalog_handler.handle(ImportCatalogCommand(snapshot))
 
     assert response.discarded == 0
-    assert len(projection_gateway.prices) == 1
+    assert len(projection_dao.prices) == 1
 
 
 async def test_the_response_names_which_price_list_a_batch_was_about(

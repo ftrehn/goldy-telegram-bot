@@ -6,13 +6,16 @@ is a real way to select the wrong rows, is the escaping: identifiers come from
 1C and may contain the characters ``LIKE`` reads as wildcards.
 """
 
-from goldy.infrastructure.adapters.persistence import (
-    sqlalchemy_catalog_query_gateway as query_gateway,
+from goldy.infrastructure.adapters.persistence.catalog_listing_statements import (
+    LIKE_ESCAPE,
+    escape_like,
+)
+from goldy.infrastructure.adapters.persistence.catalog_search_statements import (
+    MIN_TRIGRAM_LENGTH,
+    search_match,
 )
 
-LIKE_ESCAPE = query_gateway.LIKE_ESCAPE
-MIN_TRIGRAM_LENGTH = query_gateway.MIN_TRIGRAM_LENGTH
-_escape_like = query_gateway._escape_like
+_escape_like = escape_like
 
 
 def test_ordinary_text_is_left_exactly_as_it_was_typed() -> None:
@@ -47,7 +50,7 @@ def _bound_patterns(sku_term: str, name_term: str) -> set[str]:
     Read off the bound parameters rather than off the SQL text: what is being
     asserted is which pattern we chose, not how SQLAlchemy renders an ``OR``.
     """
-    compiled = query_gateway._search_match(sku_term, name_term).compile()
+    compiled = search_match(sku_term, name_term).compile()
 
     return {
         value

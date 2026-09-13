@@ -1,19 +1,23 @@
-"""carts and orders: the order number sequence, carts, cart items, orders, order items
+"""carts and orders: carts, cart items, orders, order items
 
 Revision ID: d9a4e73b62f1
 Revises: c5f28ae01b64
 Create Date: 2026-09-11 12:02:00.000000
 
-The sequence name and its start are not decorative. ``nextval`` is called on
-``orders_number_seq`` by ``PostgresOrderNumberGenerator``, which holds the same
-two values as constants, so a different name here fails the first checkout in
-the shop. The start is 1000 because ``OrderNumber`` insists on four digits, and
-a first order numbered 1 would be refused by the value object that has to build
-it.
+There is no sequence behind the order number. ``OrderNumber`` is derived by the
+aggregate from the moment of placement and the order's own id, so the column
+holds sixteen characters of text and ``uq_orders_number`` is the one guard
+against the astronomically rare collision — a refused insert rather than two
+orders with one number.
 
-``uq_carts_user_id`` is load-bearing in the same way: ``ensure_for`` inserts
-with ``ON CONFLICT (user_id) DO NOTHING``, which Postgres resolves against a
-unique index and rejects outright without one.
+``uq_carts_user_id`` is load-bearing: "one cart per person" spans aggregates,
+and the index is what turns the second of two simultaneous first additions
+into an ``IntegrityError`` the gateway reports as ``CartAlreadyExistsError``.
+
+``cancelled_by_user_id`` is who exactly stopped the order, beside ``cancelled_by``
+which says only which side did. No foreign key: the person is read for a card,
+never joined for a rule, and a staff account removed later must not take the
+history of its cancellations with it.
 
 ``payment_confirmed_at`` and ``payment_confirmed_by`` are created empty and
 stay empty. There is no ``PAID`` status, no domain method and no command that
@@ -37,8 +41,6 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.execute("CREATE SEQUENCE orders_number_seq START WITH 1000")
-
     op.create_table(
         "carts",
         sa.Column("id", sa.UUID(as_uuid=True), nullable=False),
@@ -84,6 +86,7 @@ def upgrade() -> None:
         sa.Column("recipient_last_name", sa.String(length=100), nullable=True),
         sa.Column("recipient_phone", sa.String(length=20), nullable=False),
         sa.Column("cancelled_by", sa.String(length=20), nullable=True),
+        sa.Column("cancelled_by_user_id", sa.UUID(as_uuid=True), nullable=True),
         sa.Column("cancellation_reason", sa.Text(), nullable=True),
         sa.Column("payment_confirmed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("payment_confirmed_by", sa.UUID(as_uuid=True), nullable=True),
@@ -107,7 +110,7 @@ def upgrade() -> None:
         sa.Column("order_id", sa.UUID(as_uuid=True), nullable=False),
         sa.Column("position", sa.Integer(), autoincrement=False, nullable=False),
         sa.Column("product_id", sa.String(length=128), nullable=False),
-        sa.Column("sku", sa.String(length=64), nullable=True),
+        sa.Column("sku", sa.String(length=64), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("unit_id", sa.String(length=128), nullable=True),
         sa.Column("unit_name", sa.String(length=32), nullable=False),
@@ -144,5 +147,3 @@ def downgrade() -> None:
 
     op.drop_table("cart_items")
     op.drop_table("carts")
-
-    op.execute("DROP SEQUENCE orders_number_seq")

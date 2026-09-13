@@ -29,6 +29,12 @@ class OrderRowViewMapper(Protocol):
 
     @abstractmethod
     def to_view(self, row: RowMapping, lines: Sequence[OrderLineView]) -> OrderView:
+        """Reads the order row plus ``customer_status`` and the canceller's name.
+
+        ``canceller_first_name`` and ``canceller_last_name`` come from an outer
+        join on the account that cancelled the order and are ``None`` when
+        nobody did.
+        """
         raise NotImplementedError
 
     @abstractmethod

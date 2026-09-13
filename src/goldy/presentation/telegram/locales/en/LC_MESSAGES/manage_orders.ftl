@@ -29,6 +29,7 @@ manage-orders-card =
     Total: { $total }
 manage-orders-line = { $position }. { $name } — { $quantity } × { $price } = { $total } · { $stock }
 manage-orders-customer-blocked = ⚠ customer is blocked
+manage-orders-cancelled-by-name = Cancelled by: { $name }
 manage-orders-status-button = Change status
 manage-orders-status-prompt = Which status should this order move to?
 manage-orders-reason-prompt = Send the reason for cancelling — the customer will read it.

@@ -20,14 +20,14 @@ from tests.unit.application.conftest import ActingAs
 from tests.unit.factories.catalog_factories import (
     make_category_id,
     make_category_view,
-    make_price_type_view,
     make_product_id_value,
     make_product_list_item,
     make_product_view,
+    make_resolved_price_type,
 )
 from tests.unit.factories.domain_factories import make_user_id
 from tests.unit.factories.shop_factories import PRICE_TYPE_ID
-from tests.unit.stubs.catalog import StubCatalogQueryGateway, StubPricingGateway
+from tests.unit.stubs.catalog import StubCatalogQueryGateway, StubPricingReader
 
 
 async def test_the_top_of_the_catalog_has_no_heading(
@@ -153,7 +153,7 @@ async def test_a_listing_defaults_to_names_ascending(
 
 async def test_a_customer_with_no_price_list_at_all_is_refused(
     acting_as: ActingAs,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     list_products_handler: ListProductsHandler,
 ) -> None:
     """No binding and no configured default means a broken import.
@@ -161,7 +161,7 @@ async def test_a_customer_with_no_price_list_at_all_is_refused(
     Showing an unpriced catalog instead would hide that from everyone.
     """
     acting_as(make_user_id())
-    pricing_gateway.price_type = None
+    pricing_reader.price_type = None
 
     with pytest.raises(PriceTypeNotConfiguredError):
         await list_products_handler.handle(ListProductsQuery())
@@ -169,7 +169,7 @@ async def test_a_customer_with_no_price_list_at_all_is_refused(
 
 async def test_a_price_list_in_an_unknown_currency_is_refused(
     acting_as: ActingAs,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     list_products_handler: ListProductsHandler,
 ) -> None:
     """Falling back to the default list is deliberately not an option.
@@ -177,7 +177,7 @@ async def test_a_price_list_in_an_unknown_currency_is_refused(
     It would show this customer somebody else's prices without ever saying so.
     """
     acting_as(make_user_id())
-    pricing_gateway.price_type = make_price_type_view(is_supported=False)
+    pricing_reader.price_type = make_resolved_price_type(is_supported=False)
 
     with pytest.raises(UnsupportedPriceTypeError):
         await list_products_handler.handle(ListProductsQuery())

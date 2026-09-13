@@ -49,8 +49,8 @@ from goldy.presentation.telegram.common.paging import (
     paging_data,
 )
 
-PRODUCTS_PAGE_KEY: Final[str] = "products_page"
-RESULTS_PAGE_KEY: Final[str] = "results_page"
+PRODUCTS_SCROLL_ID: Final[str] = "products_scroll"
+RESULTS_SCROLL_ID: Final[str] = "results_scroll"
 """Two page counters, because this dialog pages two different lists.
 
 Leaving a category listing on page four and then searching must not open the
@@ -193,7 +193,7 @@ async def products_getter(
     with subgroups still lists products: in 1C the goods sit in the leaves, and
     a listing restricted to the node itself would be empty almost everywhere.
     """
-    limit, offset = page_request(dialog_manager, key=PRODUCTS_PAGE_KEY)
+    limit, offset = await page_request(dialog_manager, scroll_id=PRODUCTS_SCROLL_ID)
     sort_by = current_sort(dialog_manager)
     view = await sender.send(
         ListProductsQuery(
@@ -211,7 +211,11 @@ async def products_getter(
         "is_empty": not view.products,
         "category": for_message_text(heading),
         "sort": sort_by.value,
-        **paging_data(dialog_manager, total=view.total, key=PRODUCTS_PAGE_KEY),
+        **await paging_data(
+            dialog_manager,
+            scroll_id=PRODUCTS_SCROLL_ID,
+            total=view.total,
+        ),
     }
 
 
@@ -229,7 +233,7 @@ async def search_results_getter(
     typo rather than wonder which of the two words was wrong.
     """
     term = current_term(dialog_manager)
-    limit, offset = page_request(dialog_manager, key=RESULTS_PAGE_KEY)
+    limit, offset = await page_request(dialog_manager, scroll_id=RESULTS_SCROLL_ID)
     view = await sender.send(
         SearchProductsQuery(term=term, limit=limit, offset=offset),
     )
@@ -238,7 +242,11 @@ async def search_results_getter(
         "products": [listing_row(i18n, product) for product in view.products],
         "is_empty": view.is_empty,
         "term": for_message_text(term),
-        **paging_data(dialog_manager, total=view.total, key=RESULTS_PAGE_KEY),
+        **await paging_data(
+            dialog_manager,
+            scroll_id=RESULTS_SCROLL_ID,
+            total=view.total,
+        ),
     }
 
 

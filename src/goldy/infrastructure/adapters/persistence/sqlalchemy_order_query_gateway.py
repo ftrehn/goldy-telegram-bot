@@ -132,10 +132,17 @@ class SqlAlchemyOrderQueryGateway(OrderQueryGateway):
         Raises:
             RepoError: the order could not be read.
         """
+        canceller = users_table.alias("canceller")
         stmt = (
-            select(orders_table, users_table.c.status.label("customer_status"))
+            select(
+                orders_table,
+                users_table.c.status.label("customer_status"),
+                canceller.c.first_name.label("canceller_first_name"),
+                canceller.c.last_name.label("canceller_last_name"),
+            )
             .select_from(orders_table)
             .join(users_table, users_table.c.id == orders_table.c.customer_id)
+            .outerjoin(canceller, canceller.c.id == orders_table.c.cancelled_by_user_id)
             .where(orders_table.c.id == order_id)
         )
 

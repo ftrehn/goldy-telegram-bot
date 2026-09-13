@@ -10,6 +10,7 @@ from goldy.domain.common.values.errors import CurrencyMismatchError
 from goldy.domain.common.values.money import Money
 from goldy.domain.orders.errors import UnpricedCartLineError
 from goldy.domain.orders.services.checkout_service import CheckoutService
+from goldy.domain.orders.values.order_number import OrderNumber
 from goldy.domain.orders.values.order_status import OrderStatus
 from tests.unit.factories.domain_factories import make_user_id
 from tests.unit.factories.shop_factories import (
@@ -22,17 +23,16 @@ from tests.unit.factories.shop_factories import (
     make_product_id,
     make_unit,
 )
-from tests.unit.stubs.generators import FIRST_ORDER_NUMBER, StubOrderNumberGenerator
 from tests.unit.support import emitted_event_names
 
 
-async def test_checkout_turns_the_whole_cart_into_one_order(
+def test_checkout_turns_the_whole_cart_into_one_order(
     checkout_service: CheckoutService,
     events_collection: EventsCollection,
 ) -> None:
     cart = make_cart({1: 2, 2: 1})
 
-    order = await checkout_service.checkout(make_checkout(cart))
+    order = checkout_service.checkout(make_checkout(cart))
 
     assert order.status is OrderStatus.NEW
     assert len(order.lines) == 2
@@ -40,7 +40,7 @@ async def test_checkout_turns_the_whole_cart_into_one_order(
     assert emitted_event_names(events_collection) == ["OrderPlaced"]
 
 
-async def test_the_order_keeps_the_price_and_the_name_it_was_shown(
+def test_the_order_keeps_the_price_and_the_name_it_was_shown(
     checkout_service: CheckoutService,
 ) -> None:
     """A snapshot, not a reference.
@@ -51,7 +51,7 @@ async def test_the_order_keeps_the_price_and_the_name_it_was_shown(
     cart = make_cart({1: 3})
     priced = make_priced_product(index=1, price="49.50", name="Гвозди 100 мм")
 
-    order = await checkout_service.checkout(
+    order = checkout_service.checkout(
         make_checkout(cart, priced_products=(priced,)),
     )
     line = order.lines[0]
@@ -63,7 +63,7 @@ async def test_the_order_keeps_the_price_and_the_name_it_was_shown(
     assert line.total == Money(Decimal("148.50"), Currency.RUB)
 
 
-async def test_the_order_line_keeps_the_unit_the_quantity_is_counted_in(
+def test_the_order_line_keeps_the_unit_the_quantity_is_counted_in(
     checkout_service: CheckoutService,
 ) -> None:
     """A quantity of 2 without "шт" or "м" beside it tells the customer nothing.
@@ -74,38 +74,20 @@ async def test_the_order_line_keeps_the_unit_the_quantity_is_counted_in(
     cart = make_cart({1: 2})
     priced = make_priced_product(index=1, unit=make_unit("1c-unit-006", "м"))
 
-    order = await checkout_service.checkout(
+    order = checkout_service.checkout(
         make_checkout(cart, priced_products=(priced,)),
     )
 
     assert order.lines[0].unit == priced.unit
 
 
-async def test_a_product_1c_gave_no_article_can_still_be_ordered(
-    checkout_service: CheckoutService,
-) -> None:
-    """The article is optional in 1C, and a strict one here would break checkout.
-
-    Not the import — the projection is Core-only and builds no values — but the
-    customer's "place order" button, on a product the shop sells perfectly
-    well.
-    """
-    cart = make_cart({1: 1})
-
-    order = await checkout_service.checkout(
-        make_checkout(cart, priced_products=(make_priced_product(with_sku=False),)),
-    )
-
-    assert order.lines[0].sku is None
-
-
-async def test_the_lines_are_numbered_from_one_in_the_order_the_cart_held_them(
+def test_the_lines_are_numbered_from_one_in_the_order_the_cart_held_them(
     checkout_service: CheckoutService,
 ) -> None:
     """``(order_id, position)`` is the key, the way a 1C tabular part is addressed."""
     cart = make_cart({1: 1, 2: 1, 3: 1})
 
-    order = await checkout_service.checkout(make_checkout(cart))
+    order = checkout_service.checkout(make_checkout(cart))
 
     assert [line.position for line in order.lines] == [1, 2, 3]
     assert [line.product_id for line in order.lines] == [
@@ -115,7 +97,7 @@ async def test_the_lines_are_numbered_from_one_in_the_order_the_cart_held_them(
     ]
 
 
-async def test_the_cart_is_emptied_by_the_same_operation(
+def test_the_cart_is_emptied_by_the_same_operation(
     checkout_service: CheckoutService,
 ) -> None:
     """Emptying the cart is half of the same business operation.
@@ -125,27 +107,26 @@ async def test_the_cart_is_emptied_by_the_same_operation(
     """
     cart = make_cart({1: 1})
 
-    await checkout_service.checkout(make_checkout(cart))
+    checkout_service.checkout(make_checkout(cart))
 
     assert cart.is_empty is True
 
 
-async def test_an_empty_cart_cannot_be_checked_out(
+def test_an_empty_cart_cannot_be_checked_out(
     checkout_service: CheckoutService,
-    order_number_generator: StubOrderNumberGenerator,
+    events_collection: EventsCollection,
 ) -> None:
     cart = make_cart()
 
     with pytest.raises(EmptyCartError):
-        await checkout_service.checkout(make_checkout(cart))
+        checkout_service.checkout(make_checkout(cart))
 
-    assert order_number_generator.calls == 0
+    assert emitted_event_names(events_collection) == []
 
 
-async def test_a_product_the_catalog_can_no_longer_price_leaves_the_cart_alone(
+def test_a_product_the_catalog_can_no_longer_price_leaves_the_cart_alone(
     checkout_service: CheckoutService,
     events_collection: EventsCollection,
-    order_number_generator: StubOrderNumberGenerator,
 ) -> None:
     """Nothing is minted or emptied until every line is built.
 
@@ -155,16 +136,15 @@ async def test_a_product_the_catalog_can_no_longer_price_leaves_the_cart_alone(
     cart = make_cart({1: 1, 2: 1})
 
     with pytest.raises(UnpricedCartLineError):
-        await checkout_service.checkout(
+        checkout_service.checkout(
             make_checkout(cart, priced_products=(make_priced_product(index=1),)),
         )
 
     assert cart.line_count == 2
-    assert order_number_generator.calls == 0
     assert emitted_event_names(events_collection) == []
 
 
-async def test_a_cart_priced_in_two_currencies_leaves_it_alone_as_well(
+def test_a_cart_priced_in_two_currencies_leaves_it_alone_as_well(
     checkout_service: CheckoutService,
     events_collection: EventsCollection,
 ) -> None:
@@ -175,38 +155,44 @@ async def test_a_cart_priced_in_two_currencies_leaves_it_alone_as_well(
     )
 
     with pytest.raises(CurrencyMismatchError):
-        await checkout_service.checkout(make_checkout(cart, priced_products=priced))
+        checkout_service.checkout(make_checkout(cart, priced_products=priced))
 
     assert cart.line_count == 2
     assert emitted_event_names(events_collection) == []
 
 
-async def test_the_order_takes_its_number_from_the_generator(
+def test_the_order_takes_its_id_from_the_generator_and_spells_its_number_itself(
     checkout_service: CheckoutService,
 ) -> None:
-    """Asking a database sequence is I/O, which is why this service is async."""
-    order = await checkout_service.checkout(make_checkout(make_cart({1: 1})))
+    """No sequence and no I/O: the number is derived from the id and the clock."""
+    order = checkout_service.checkout(make_checkout(make_cart({1: 1})))
 
-    assert str(order.number) == str(FIRST_ORDER_NUMBER)
     assert order.id == UUID(int=1)
+    assert (
+        str(order.number)
+        == OrderNumber.derive(
+            placed_at=order.created_at,
+            order_id=order.id,
+        ).value
+    )
 
 
-async def test_two_checkouts_get_different_numbers(
+def test_two_checkouts_get_different_numbers(
     checkout_service: CheckoutService,
 ) -> None:
-    first = await checkout_service.checkout(make_checkout(make_cart({1: 1})))
-    second = await checkout_service.checkout(make_checkout(make_cart({2: 1})))
+    first = checkout_service.checkout(make_checkout(make_cart({1: 1})))
+    second = checkout_service.checkout(make_checkout(make_cart({2: 1})))
 
     assert first.number != second.number
     assert first.id != second.id
 
 
-async def test_the_order_carries_the_delivery_details_it_was_checked_out_with(
+def test_the_order_carries_the_delivery_details_it_was_checked_out_with(
     checkout_service: CheckoutService,
 ) -> None:
     cart = make_cart({1: 1})
 
-    order = await checkout_service.checkout(
+    order = checkout_service.checkout(
         make_checkout(cart, comment="Позвонить за час"),
     )
 
@@ -216,7 +202,7 @@ async def test_the_order_carries_the_delivery_details_it_was_checked_out_with(
     assert str(order.comment) == "Позвонить за час"
 
 
-async def test_the_order_records_the_price_type_it_was_priced_by(
+def test_the_order_records_the_price_type_it_was_priced_by(
     checkout_service: CheckoutService,
 ) -> None:
     """The snapshot answers "why was it this price" months later.
@@ -226,7 +212,7 @@ async def test_the_order_records_the_price_type_it_was_priced_by(
     """
     cart = make_cart({1: 1})
 
-    order = await checkout_service.checkout(make_checkout(cart))
+    order = checkout_service.checkout(make_checkout(cart))
 
     assert order.price_type_id == make_price_type_id()
     assert order.total == make_money()

@@ -95,7 +95,7 @@ catalog_products_table: Final[Table] = Table(
     "catalog_products",
     mapper_registry.metadata,
     Column("id", String(MAX_SOURCE_ID_COLUMN_LENGTH), primary_key=True),
-    Column("sku", String(MAX_SKU_COLUMN_LENGTH), nullable=True),
+    Column("sku", String(MAX_SKU_COLUMN_LENGTH), nullable=False),
     Column("name", String(MAX_PRODUCT_NAME_COLUMN_LENGTH), nullable=False),
     Column("full_name", Text, nullable=True),
     Column(
@@ -144,9 +144,10 @@ Groups never arrive here — an element of the reference that is a group goes to
 clause of the exchange contract rather than a flag on a row, which is why there
 is no column for it.
 
-``sku`` is nullable because the article is an optional attribute in 1C, and a
-product without one is ordinary. Search by article does not suffer: the
-generated ``sku_normalized`` is NULL for such a row and never enters the index.
+``sku`` is mandatory. The article is an optional attribute in 1C, but every
+element of the reference has a code, and the exchange sends the code where the
+article is blank — so every row here has something a customer can search by
+and an order line can keep.
 
 A product is deactivated and kept forever rather than deleted. Placed orders
 point at it and a customer expects to open the card of something they bought

@@ -7,13 +7,21 @@ from goldy.infrastructure.mappers.adaptix_cart_summary_view_mapper import (
     AdaptixCartSummaryViewMapper,
 )
 from goldy.infrastructure.mappers.adaptix_user_view_mapper import AdaptixUserViewMapper
+from goldy.infrastructure.mappers.cart_row_view_mapper import CartRowViewMapper
 from goldy.infrastructure.mappers.catalog_row_view_mapper import CatalogRowViewMapper
 from goldy.infrastructure.mappers.order_row_view_mapper import OrderRowViewMapper
+from goldy.infrastructure.mappers.pricing_row_mapper import PricingRowMapper
+from goldy.infrastructure.mappers.sqlalchemy_cart_row_view_mapper import (
+    SqlAlchemyCartRowViewMapper,
+)
 from goldy.infrastructure.mappers.sqlalchemy_catalog_row_view_mapper import (
     SqlAlchemyCatalogRowViewMapper,
 )
 from goldy.infrastructure.mappers.sqlalchemy_order_row_view_mapper import (
     SqlAlchemyOrderRowViewMapper,
+)
+from goldy.infrastructure.mappers.sqlalchemy_pricing_row_mapper import (
+    SqlAlchemyPricingRowMapper,
 )
 from goldy.infrastructure.mappers.sqlalchemy_user_row_view_mapper import (
     SqlAlchemyUserRowViewMapper,
@@ -50,5 +58,7 @@ def mappers_provider() -> Provider:
         source=SqlAlchemyCatalogRowViewMapper,
         provides=CatalogRowViewMapper,
     )
+    provider.provide(source=SqlAlchemyCartRowViewMapper, provides=CartRowViewMapper)
+    provider.provide(source=SqlAlchemyPricingRowMapper, provides=PricingRowMapper)
     provider.provide(source=SqlAlchemyOrderRowViewMapper, provides=OrderRowViewMapper)
     return provider

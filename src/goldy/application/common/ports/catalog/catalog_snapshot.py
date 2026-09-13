@@ -63,10 +63,17 @@ class CategoryRow:
 
 @dataclass(frozen=True, kw_only=True)
 class ProductRow:
-    """One product of the 1C nomenclature reference."""
+    """One product of the 1C nomenclature reference.
+
+    ``sku`` is mandatory. The article is an optional attribute in 1C, but every
+    element has a code, and the exchange sends the code where the article is
+    blank — so a row without one is a broken export and the mapper refuses it
+    before it gets here. That is what lets an order line keep a ``Sku`` rather
+    than a maybe.
+    """
 
     id: str
-    sku: str | None
+    sku: str
     name: str
     full_name: str | None = None
     category_id: str | None = None
@@ -165,6 +172,19 @@ class CatalogSnapshot:
 
     ``batch_id`` is written onto every row this snapshot touches, which is what
     the sweep afterwards selects by.
+
+    **This is our contract, not 1C's format.** The rows here are the shape the
+    projection needs, named in our words, and nothing in the application ever
+    reads a 1C attribute by its 1C name. Whatever 1C actually sends — a
+    ``Номенклатура`` element with ``ЭтоГруппа``, an ``Артикул`` that is blank
+    and a ``Код`` that never is, a price register keyed by ``ВидЦен`` — is the
+    business of the adapter that receives it: today ``JsonFileCatalogSource``
+    with the mapper behind it, tomorrow the HTTP receiver 1C posts to. That is
+    where a 1C attribute is renamed, a blank article is replaced by the code,
+    and a number is turned into text. When the real export turns out to be
+    shaped differently from the fixture, the mapper changes and this file does
+    not; and if a fact 1C sends turns out to be needed here, a row grows a
+    field with a name of ours.
     """
 
     batch_id: str

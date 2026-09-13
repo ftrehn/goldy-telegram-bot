@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import final
 
@@ -28,7 +29,7 @@ class Placement:
     """
 
     customer_id: UserId
-    lines: tuple[OrderLine, ...]
+    lines: Sequence[OrderLine]
     delivery_address: DeliveryAddress
     recipient: Recipient
     comment: OrderComment | None

@@ -30,9 +30,13 @@ from goldy.domain.orders.entities.order import Order
 from goldy.domain.orders.entities.order_line import OrderLine
 from goldy.domain.users.errors import AuthorizationError
 from tests.unit.application.conftest import ActingAs, UserSeeder
-from tests.unit.factories.order_factories import make_priced_product_view
-from tests.unit.factories.shop_factories import make_order_id, make_order_line
-from tests.unit.stubs.catalog import StubPricingGateway
+from tests.unit.factories.shop_factories import (
+    make_order_id,
+    make_order_line,
+    make_priced_product,
+    make_product_id,
+)
+from tests.unit.stubs.catalog import StubPricingReader
 from tests.unit.stubs.orders import InMemoryCartCommandGateway
 
 from .conftest import CartSeeder, OrderSeeder
@@ -74,16 +78,16 @@ async def test_an_order_that_still_sells_goes_back_in_the_cart_whole(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     cart_gateway: InMemoryCartCommandGateway,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
     customer = await seed_user()
     acting_as(customer.id)
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
 
     view = await repeat_order_handler.handle(repeat(order))
@@ -99,7 +103,7 @@ async def test_the_price_is_read_afresh_and_never_taken_from_the_snapshot(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
     """The one thing ADR-0003 forbids outright, and how it is held.
@@ -115,21 +119,21 @@ async def test_the_price_is_read_afresh_and_never_taken_from_the_snapshot(
     customer = await seed_user()
     acting_as(customer.id)
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1, price="1000.00"),
-        make_priced_product_view(2, price="1000.00"),
+    pricing_reader.priced_products = (
+        make_priced_product(1, price="1000.00"),
+        make_priced_product(2, price="1000.00"),
     )
 
     await repeat_order_handler.handle(repeat(order))
 
-    assert pricing_gateway.asked_for == [customer.id]
+    assert pricing_reader.asked_for == [customer.id]
 
 
 async def test_a_product_the_catalog_has_lost_is_left_behind_by_name(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     cart_gateway: InMemoryCartCommandGateway,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
@@ -137,7 +141,7 @@ async def test_a_product_the_catalog_has_lost_is_left_behind_by_name(
     customer = await seed_user()
     acting_as(customer.id)
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = (make_priced_product_view(1),)
+    pricing_reader.priced_products = (make_priced_product(1),)
 
     view = await repeat_order_handler.handle(repeat(order))
 
@@ -151,7 +155,7 @@ async def test_a_product_a_sweep_deactivated_is_left_behind_as_well(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     cart_gateway: InMemoryCartCommandGateway,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
@@ -167,7 +171,7 @@ async def test_a_product_a_sweep_deactivated_is_left_behind_as_well(
     customer = await seed_user()
     acting_as(customer.id)
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = (make_priced_product_view(1),)
+    pricing_reader.priced_products = (make_priced_product(1),)
 
     view = await repeat_order_handler.handle(repeat(order))
 
@@ -179,7 +183,7 @@ async def test_a_product_this_price_list_no_longer_covers_is_left_behind(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     cart_gateway: InMemoryCartCommandGateway,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
@@ -193,10 +197,8 @@ async def test_a_product_this_price_list_no_longer_covers_is_left_behind(
     customer = await seed_user()
     acting_as(customer.id)
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2, price=None),
-    )
+    pricing_reader.priced_products = (make_priced_product(1),)
+    pricing_reader.unpriced_product_ids = (make_product_id(2),)
 
     view = await repeat_order_handler.handle(repeat(order))
 
@@ -209,7 +211,7 @@ async def test_an_order_nothing_of_which_still_sells_moves_nothing(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     cart_gateway: InMemoryCartCommandGateway,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
@@ -222,7 +224,7 @@ async def test_an_order_nothing_of_which_still_sells_moves_nothing(
     customer = await seed_user()
     acting_as(customer.id)
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = ()
+    pricing_reader.priced_products = ()
 
     view = await repeat_order_handler.handle(repeat(order))
 
@@ -236,7 +238,7 @@ async def test_what_was_already_in_the_cart_stays_where_it_was(
     acting_as: ActingAs,
     seed_cart: CartSeeder,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     cart_gateway: InMemoryCartCommandGateway,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
@@ -251,9 +253,9 @@ async def test_what_was_already_in_the_cart_stays_where_it_was(
     acting_as(customer.id)
     seed_cart(customer.id, {1: 7, 3: 4})
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
 
     view = await repeat_order_handler.handle(repeat(order))
@@ -271,7 +273,7 @@ async def test_repeating_twice_leaves_the_cart_the_first_one_left(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     cart_gateway: InMemoryCartCommandGateway,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
@@ -285,9 +287,9 @@ async def test_repeating_twice_leaves_the_cart_the_first_one_left(
     customer = await seed_user()
     acting_as(customer.id)
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
 
     await repeat_order_handler.handle(repeat(order))
@@ -301,7 +303,7 @@ async def test_a_cart_with_no_room_left_refuses_instead_of_filling_up(
     acting_as: ActingAs,
     seed_cart: CartSeeder,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
     """The ceiling is the cart's rule and is left to the cart to enforce.
@@ -316,9 +318,9 @@ async def test_a_cart_with_no_room_left_refuses_instead_of_filling_up(
     acting_as(customer.id)
     seed_cart(customer.id, dict.fromkeys(range(10, 10 + MAX_CART_LINES), 1))
     order = seed_order(customer.id, lines=two_lines())
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
 
     with pytest.raises(CartLineLimitExceededError):
@@ -329,7 +331,7 @@ async def test_somebody_elses_order_cannot_be_repeated(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_order: OrderSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     cart_gateway: InMemoryCartCommandGateway,
     repeat_order_handler: RepeatOrderHandler,
 ) -> None:
@@ -346,13 +348,13 @@ async def test_somebody_elses_order_cannot_be_repeated(
     intruder = await seed_user(phone_number="+79994445566", external_id="222")
     acting_as(intruder.id)
     seed_order(owner.id, lines=two_lines())
-    pricing_gateway.priced_products = (make_priced_product_view(1),)
+    pricing_reader.priced_products = (make_priced_product(1),)
 
     with pytest.raises(AuthorizationError):
         await repeat_order_handler.handle(RepeatOrderCommand(order_id=make_order_id()))
 
     assert cart_gateway.carts == {}
-    assert pricing_gateway.asked_for == []
+    assert pricing_reader.asked_for == []
 
 
 async def test_an_order_that_does_not_exist_is_refused_as_missing(

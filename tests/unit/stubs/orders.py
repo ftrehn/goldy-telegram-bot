@@ -9,14 +9,12 @@ asked for, with which filters and for whose orders, is the interesting part of
 it; reimplementing the SQL in Python here would only test the reimplementation.
 
 The cart gateway lives here rather than with the cart use cases because placing
-an order needs one, and ``ensure_for`` is the half of that port checkout uses:
-it never fails on a missing cart, it creates one — which is exactly how a
-second confirmation tap ends up meeting an empty cart instead of a missing one.
+an order needs one. It is as thin as the real port: a read by owner and an add
+that refuses a second cart for the same person, the way the unique index does.
 """
 
 from dataclasses import dataclass
-from typing import Final, final, override
-from uuid import UUID
+from typing import final, override
 
 from goldy.application.common.ports.carts import CartCommandGateway
 from goldy.application.common.ports.orders import (
@@ -29,9 +27,8 @@ from goldy.application.common.query_params.order_filters import (
 )
 from goldy.application.common.query_params.pagination import Pagination
 from goldy.application.common.views.order import OrderListView, OrderView
+from goldy.application.error import CartAlreadyExistsError
 from goldy.domain.carts.entities.cart import Cart
-from goldy.domain.carts.values.cart_id import CartId
-from goldy.domain.common.events_collection import EventsCollection
 from goldy.domain.orders.entities.order import Order
 from goldy.domain.orders.values.order_id import OrderId
 from goldy.domain.users.values.user_id import UserId
@@ -49,27 +46,29 @@ class OrdersRead:
 
 @final
 class InMemoryCartCommandGateway(CartCommandGateway):
-    """Carts by owner, one per person, created on demand like the real one."""
+    """Carts by owner, one per person, refusing a second like the unique index.
 
-    def __init__(self, events_collection: EventsCollection) -> None:
-        self._events_collection: Final[EventsCollection] = events_collection
+    ``rival`` stages the race the index exists for: when it is set, the next
+    ``add`` finds that somebody inserted ``rival`` first and refuses, exactly
+    as the database does when a concurrent request committed between the
+    provider's read and its insert.
+    """
+
+    def __init__(self) -> None:
         self.carts: dict[UserId, Cart] = {}
-        self._next_cart: int = 1
+        self.rival: Cart | None = None
 
     @override
-    async def ensure_for(self, user_id: UserId) -> Cart:
-        cart = self.carts.get(user_id)
+    async def add(self, cart: Cart) -> None:
+        if self.rival is not None:
+            self.carts[self.rival.user_id] = self.rival
+            self.rival = None
 
-        if cart is None:
-            cart = Cart.create(
-                cart_id=CartId(UUID(int=self._next_cart)),
-                events_collection=self._events_collection,
-                user_id=user_id,
-            )
-            self._next_cart += 1
-            self.carts[user_id] = cart
+        if cart.user_id in self.carts:
+            msg = f"User '{cart.user_id}' already has a cart."
+            raise CartAlreadyExistsError(msg)
 
-        return cart
+        self.carts[cart.user_id] = cart
 
     @override
     async def by_user_id(self, user_id: UserId) -> Cart | None:

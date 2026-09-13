@@ -106,4 +106,4 @@ def test_a_price_times_the_largest_quantity_stays_within_range() -> None:
     """The two ceilings have to fit each other, or a legal cart cannot be ordered."""
     total = Money(Decimal("9999.99")).times(Quantity(value=MAX_QUANTITY))
 
-    assert total.amount == Decimal("99999900.00")
+    assert total.amount == Decimal("9999990000.00")

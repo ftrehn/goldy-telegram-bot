@@ -239,13 +239,13 @@ async def test_the_next_order_is_offered_the_address_the_last_one_went_to(
 ) -> None:
     """A returning customer types their address once, not every time.
 
-    ``None`` for somebody ordering for the first time is the ordinary answer
-    and not a failure — the address screen simply draws no button.
+    An empty view for somebody ordering for the first time is the ordinary
+    answer and not a failure — the address screen simply draws no button.
     """
     await publish_catalog(a_shop())
     customer = await register_shopper()
 
-    assert await act(customer, GetLastDeliveryAddressQuery()) is None
+    assert (await act(customer, GetLastDeliveryAddressQuery())).address is None
 
     placed = await place_order(customer)
     await act(
@@ -256,7 +256,8 @@ async def test_the_next_order_is_offered_the_address_the_last_one_went_to(
         ),
     )
 
-    assert await act(customer, GetLastDeliveryAddressQuery()) == ANOTHER_ADDRESS
+    last = await act(customer, GetLastDeliveryAddressQuery())
+    assert last.address == ANOTHER_ADDRESS
 
 
 async def _move(

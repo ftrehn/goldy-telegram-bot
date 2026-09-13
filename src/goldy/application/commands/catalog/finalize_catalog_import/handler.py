@@ -7,7 +7,7 @@ from goldy.application.commands.catalog.finalize_catalog_import.command import (
 from goldy.application.commands.catalog.scope_description import describe_scope
 from goldy.application.common.mediator.handlers import CommandHandler
 from goldy.application.common.ports.catalog import (
-    CatalogProjectionGateway,
+    CatalogProjectionDao,
     CatalogScopeKind,
 )
 from goldy.application.common.views.catalog import CatalogFinalizationResponse
@@ -22,7 +22,7 @@ class FinalizeCatalogImportHandler(
 ):
     """Sweeps one scope clean of everything the batch did not mention.
 
-    What "sweeps" means is the gateway's business and differs by scope, which
+    What "sweeps" means is the DAO's business and differs by scope, which
     is the one thing about this command that must not be confused: products and
     categories are deactivated and kept forever because placed orders point at
     them, while prices and stock are deleted, since a price withdrawn in 1C
@@ -47,12 +47,10 @@ class FinalizeCatalogImportHandler(
 
     def __init__(
         self,
-        catalog_projection_gateway: CatalogProjectionGateway,
+        catalog_projection_dao: CatalogProjectionDao,
         default_price_type_id: PriceTypeId,
     ) -> None:
-        self._catalog_projection_gateway: Final[CatalogProjectionGateway] = (
-            catalog_projection_gateway
-        )
+        self._catalog_projection_dao: Final[CatalogProjectionDao] = catalog_projection_dao
         self._default_price_type_id: Final[PriceTypeId] = default_price_type_id
 
     @override
@@ -60,8 +58,10 @@ class FinalizeCatalogImportHandler(
         self,
         command: FinalizeCatalogImportCommand,
     ) -> CatalogFinalizationResponse:
-        gateway = self._catalog_projection_gateway
-        swept = await gateway.finalize(command.scope, command.batch_id)
+        swept = await self._catalog_projection_dao.finalize(
+            command.scope,
+            command.batch_id,
+        )
 
         if command.scope.kind is CatalogScopeKind.PRICE_TYPES:
             await self._ensure_default_price_type_survived()
@@ -87,7 +87,7 @@ class FinalizeCatalogImportHandler(
             CatalogSnapshotError: the configured default price type is not in
                 the projection now that this batch has been swept.
         """
-        present = await self._catalog_projection_gateway.has_price_type(
+        present = await self._catalog_projection_dao.has_price_type(
             self._default_price_type_id,
         )
 

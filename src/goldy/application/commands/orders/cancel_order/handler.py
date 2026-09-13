@@ -61,4 +61,7 @@ class CancelOrderHandler(CommandHandler[CancelOrderCommand, None]):
             ),
         )
 
-        order.cancel(initiated_by=CancellationInitiator.CUSTOMER)
+        order.cancel(
+            initiated_by=CancellationInitiator.CUSTOMER,
+            cancelled_by_user_id=customer.id,
+        )

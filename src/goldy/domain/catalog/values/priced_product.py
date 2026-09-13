@@ -13,22 +13,21 @@ from goldy.domain.common.values.money import Money
 class PricedProduct(ValueObject):
     """A product with the price this particular customer pays for it.
 
-    Never persisted. It is what the pricing application service assembles from
-    the read model it has just queried, and it is the one place where
-    primitives out of that read model become validated domain values before an
-    order is allowed to keep them as a snapshot.
+    Never persisted. It is what the pricing reader assembles out of the
+    projection for one checkout, and it is the shape an order line is
+    snapshotted from: every field is a validated domain value, so nothing
+    reaches an order that the catalog could not vouch for.
 
-    ``sku`` is optional, and that is a fact about the source rather than a
-    concession: the article is an optional attribute in 1C and products without
-    one exist in practically every database. A mandatory ``Sku`` here would not
-    break the import — the projection is Core-only and builds no values — it
-    would break ``CheckoutService._build_line``, which is the customer's
-    "place order" button. ``Sku`` itself stays strict: it validates the value,
-    not its presence.
+    ``sku`` is mandatory, and so is ``unit_price``. A product the projection
+    holds without a price under this price list is not a priced product at
+    all — the reader reports it separately and the application refuses the
+    checkout — and a product without an article is a broken export, which the
+    exchange contract rules out by sending the 1C code where the article is
+    blank.
     """
 
     product_id: ProductId
-    sku: Sku | None
+    sku: Sku
     name: ProductName
     unit: UnitOfMeasure
     unit_price: Money

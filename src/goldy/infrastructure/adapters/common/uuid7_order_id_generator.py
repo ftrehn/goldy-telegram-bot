@@ -14,9 +14,9 @@ class Uuid7OrderIdGenerator(OrderIdGenerator):
     on neighbouring index pages instead of scattering an insert across the
     whole B-tree.
 
-    Synchronous, unlike ``OrderNumberGenerator`` beside it. A UUID is made up
-    locally and needs nobody's permission; the human-readable number has to be
-    unique and increasing, which means asking the database.
+    The human-readable number is not minted here or anywhere else: ``Order``
+    derives it from this id and the moment of placement, so one generator is
+    all an order needs.
     """
 
     @override

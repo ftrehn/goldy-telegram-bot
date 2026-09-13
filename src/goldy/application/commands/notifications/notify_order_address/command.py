@@ -15,9 +15,13 @@ class NotifyDeliveryAddressChangedCommand(Command[NotificationOutcome]):
     nothing. The old one is not recoverable anywhere else — the aggregate
     remembers only the new one — so "was → now" can be assembled from the event
     and from nothing else.
+
+    :attr:`event_type` is the name the message was published under, carried
+    by whoever received it so the inbox records what the claim was for.
     """
 
     message_id: UUID
+    event_type: str
     order_number: str
     customer_id: UUID
     old_address: str

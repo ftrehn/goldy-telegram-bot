@@ -1,18 +1,21 @@
 import logging
 from collections.abc import Sequence
-from typing import Final, override
+from typing import Final, final, override
 
 from sqlalchemy import Executable, RowMapping, and_, func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from goldy.application.common.ports.catalog import PricingGateway
-from goldy.application.common.views.catalog import PriceTypeView, PricedProductView
+from goldy.application.common.ports.catalog import (
+    CartPrices,
+    PricingReader,
+    ResolvedPriceType,
+)
 from goldy.domain.catalog.values.price_type_id import PriceTypeId
 from goldy.domain.catalog.values.product_id import ProductId
 from goldy.domain.users.values.user_id import UserId
 from goldy.infrastructure.errors import RepoError
-from goldy.infrastructure.mappers.catalog_row_view_mapper import CatalogRowViewMapper
+from goldy.infrastructure.mappers.pricing_row_mapper import PricingRowMapper
 from goldy.infrastructure.persistence.models import (
     catalog_price_type_bindings_table,
     catalog_price_types_table,
@@ -24,7 +27,8 @@ from goldy.infrastructure.persistence.models import (
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
 
-class SqlAlchemyPricingGateway(PricingGateway):
+@final
+class SqlAlchemyPricingReader(PricingReader):
     """Reads the same prices the storefront shows, to keep them in an order.
 
     Nothing here is cached and nothing here may be: these rows become the
@@ -47,14 +51,14 @@ class SqlAlchemyPricingGateway(PricingGateway):
         self,
         session: AsyncSession,
         default_price_type_id: PriceTypeId,
-        catalog_row_view_mapper: CatalogRowViewMapper,
+        pricing_row_mapper: PricingRowMapper,
     ) -> None:
         self._session: Final[AsyncSession] = session
         self._default_price_type_id: Final[PriceTypeId] = default_price_type_id
-        self._mapper: Final[CatalogRowViewMapper] = catalog_row_view_mapper
+        self._mapper: Final[PricingRowMapper] = pricing_row_mapper
 
     @override
-    async def read_price_type_for(self, user_id: UserId) -> PriceTypeView | None:
+    async def read_price_type_for(self, user_id: UserId) -> ResolvedPriceType | None:
         bound = (
             select(catalog_price_type_bindings_table.c.price_type_id)
             .select_from(
@@ -76,28 +80,29 @@ class SqlAlchemyPricingGateway(PricingGateway):
         ).where(catalog_price_types_table.c.id == resolved)
 
         row = await self._row(stmt, "the price type of the customer")
-        return None if row is None else self._mapper.to_price_type_view(row)
+        return None if row is None else self._mapper.to_resolved_price_type(row)
 
     @override
-    async def read_priced_products(
+    async def read_cart_prices(
         self,
         product_ids: Sequence[ProductId],
         price_type_id: PriceTypeId,
-    ) -> Sequence[PricedProductView]:
-        """Every product of this list the catalog still holds, priced or not.
+    ) -> CartPrices:
+        """Every product of this list the catalog still holds, sorted by price.
 
-        The two absences are kept apart on purpose and answered by different
-        errors upstream: a product missing from the result is gone from the
-        catalog, while a product present without a price has no row under this
-        price list. Collapsing them here would turn "we no longer sell this"
-        into "ask a manager about the price".
+        One outer join, and the rows fall on two sides of it. A row with an
+        amount becomes a domain value; a row without one names a product the
+        catalog lists but does not price under this list. The two are kept
+        apart on purpose and answered by different errors upstream: collapsing
+        them here would turn "we no longer sell this" into "ask a manager
+        about the price".
 
         ``is_active`` is the same predicate the storefront's ``product_exists``
         uses. A withdrawn product must not be ordered under a price row that
         outlived it by a sweep.
         """
         if not product_ids:
-            return ()
+            return CartPrices(priced_products=(), unpriced_product_ids=())
 
         stmt = (
             select(
@@ -127,7 +132,19 @@ class SqlAlchemyPricingGateway(PricingGateway):
         )
 
         rows = await self._rows(stmt, "the prices of the cart")
-        return [self._mapper.to_priced_product_view(row) for row in rows]
+
+        return CartPrices(
+            priced_products=[
+                self._mapper.to_priced_product(row)
+                for row in rows
+                if row["amount"] is not None
+            ],
+            unpriced_product_ids=[
+                ProductId(value=row["product_id"])
+                for row in rows
+                if row["amount"] is None
+            ],
+        )
 
     async def _rows(self, stmt: Executable, what: str) -> Sequence[RowMapping]:
         try:

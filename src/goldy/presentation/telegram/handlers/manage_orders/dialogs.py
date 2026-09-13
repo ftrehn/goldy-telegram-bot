@@ -4,21 +4,21 @@ from typing import Final
 from aiogram.enums import ContentType
 from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.input import MessageInput
-from aiogram_dialog.widgets.kbd import Button, Group, Select, SwitchTo
+from aiogram_dialog.widgets.kbd import Button, Cancel, Group, Select, SwitchTo
 from aiogram_dialog.widgets.text import Format
 
 from goldy.presentation.telegram.common import text_keys
-from goldy.presentation.telegram.common.paging import paging_row
+from goldy.presentation.telegram.common.paging import paging_widgets
 from goldy.presentation.telegram.common.widgets import I18NFormat
 from goldy.presentation.telegram.handlers.manage_orders.callbacks import (
     on_cancellation_reason_typed,
-    on_close,
     on_filter_cleared,
     on_filter_selected,
     on_order_selected,
     on_status_selected,
 )
 from goldy.presentation.telegram.handlers.manage_orders.getters import (
+    QUEUE_SCROLL_ID,
     filters_getter,
     managed_order_card_getter,
     queue_getter,
@@ -45,13 +45,13 @@ MANAGE_ORDERS_DIALOG: Final[Dialog] = Dialog(
             ),
             width=1,
         ),
-        paging_row(),
+        *paging_widgets(QUEUE_SCROLL_ID),
         SwitchTo(
             I18NFormat(text_keys.MANAGE_ORDERS_FILTER_BUTTON, filter=Format("{filter}")),
             id="filter",
             state=ManageOrdersStates.FILTER,
         ),
-        Button(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close", on_click=on_close),
+        Cancel(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close"),
         state=ManageOrdersStates.QUEUE,
         getter=queue_getter,
     ),
@@ -102,6 +102,11 @@ MANAGE_ORDERS_DIALOG: Final[Dialog] = Dialog(
             by=Format("{cancelled_by}"),
         ),
         I18NFormat(
+            text_keys.MANAGE_ORDERS_CANCELLED_BY_NAME,
+            when="has_canceller_name",
+            name=Format("{canceller_name}"),
+        ),
+        I18NFormat(
             text_keys.ORDER_CANCELLATION_REASON,
             when="has_reason",
             reason=Format("{reason}"),
@@ -117,7 +122,7 @@ MANAGE_ORDERS_DIALOG: Final[Dialog] = Dialog(
             id="back",
             state=ManageOrdersStates.QUEUE,
         ),
-        Button(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close", on_click=on_close),
+        Cancel(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close"),
         state=ManageOrdersStates.CARD,
         getter=managed_order_card_getter,
     ),

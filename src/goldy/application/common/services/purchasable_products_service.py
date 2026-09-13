@@ -1,9 +1,10 @@
 from collections.abc import Sequence
 from typing import Final, final
 
-from goldy.application.common.ports.catalog import PricingGateway
-from goldy.application.common.services.price_type_provider import PriceTypeProvider
+from goldy.application.common.ports.catalog import PricingReader
+from goldy.application.common.services.price_type_resolver import PriceTypeResolver
 from goldy.domain.catalog.values.product_id import ProductId
+from goldy.domain.users.values.user_id import UserId
 
 
 @final
@@ -17,7 +18,7 @@ class PurchasableProductsService:
     cart line — it cannot be ordered — so one question is asked and one answer
     comes back.
 
-    Reads through :class:`PricingGateway` rather than ``CatalogQueryGateway``,
+    Reads through :class:`PricingReader` rather than ``CatalogQueryGateway``,
     and the difference between those two ports is exactly this question.
     ``read_existing_product_ids`` answers "is it still in the catalog" and
     knows nothing about price lists, and a caching decorator over it would be
@@ -34,13 +35,17 @@ class PurchasableProductsService:
 
     def __init__(
         self,
-        price_type_provider: PriceTypeProvider,
-        pricing_gateway: PricingGateway,
+        price_type_resolver: PriceTypeResolver,
+        pricing_reader: PricingReader,
     ) -> None:
-        self._price_type_provider: Final[PriceTypeProvider] = price_type_provider
-        self._pricing_gateway: Final[PricingGateway] = pricing_gateway
+        self._price_type_resolver: Final[PriceTypeResolver] = price_type_resolver
+        self._pricing_reader: Final[PricingReader] = pricing_reader
 
-    async def among(self, product_ids: Sequence[ProductId]) -> frozenset[ProductId]:
+    async def among(
+        self,
+        customer_id: UserId,
+        product_ids: Sequence[ProductId],
+    ) -> frozenset[ProductId]:
         """Which of these the customer's own price list can sell them now.
 
         A set rather than the priced rows, because the one caller puts products
@@ -60,14 +65,7 @@ class PurchasableProductsService:
         if not product_ids:
             return frozenset()
 
-        price_type_id = await self._price_type_provider.current()
-        views = await self._pricing_gateway.read_priced_products(
-            product_ids,
-            price_type_id,
-        )
+        price_type_id = await self._price_type_resolver.resolve_for(customer_id)
+        prices = await self._pricing_reader.read_cart_prices(product_ids, price_type_id)
 
-        return frozenset(
-            ProductId(value=view.product_id)
-            for view in views
-            if view.unit_price is not None
-        )
+        return frozenset(priced.product_id for priced in prices.priced_products)

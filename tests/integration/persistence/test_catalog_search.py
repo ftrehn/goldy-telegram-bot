@@ -259,7 +259,7 @@ def _a_workshop() -> CatalogSnapshot:
     )
 
 
-def _a_product(index: int, name: str, sku: str | None) -> ProductRow:
+def _a_product(index: int, name: str, sku: str) -> ProductRow:
     return ProductRow(
         id=make_product_id(index).value,
         sku=sku,

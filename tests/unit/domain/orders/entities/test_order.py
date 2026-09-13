@@ -26,16 +26,15 @@ from goldy.domain.orders.events import (
 from goldy.domain.orders.values.cancellation_initiator import CancellationInitiator
 from goldy.domain.orders.values.cancellation_reason import CancellationReason
 from goldy.domain.orders.values.order_status import OrderStatus
+from goldy.domain.users.values.user_id import UserId
 from tests.unit.factories.domain_factories import make_events_collection, make_user_id
 from tests.unit.factories.shop_factories import (
     DELIVERY_ADDRESS,
-    ORDER_NUMBER,
     PRICE_TYPE_ID,
     make_delivery_address,
     make_order,
     make_order_id,
     make_order_line,
-    make_order_number,
     make_placement,
     make_price_type_id,
 )
@@ -44,6 +43,9 @@ from tests.unit.support import drain, emitted_event_names, emitted_events
 OTHER_ADDRESS: str = "Казань, улица Баумана, 10"
 
 PRIMITIVE_TYPES: Final[tuple[type, ...]] = (str, int, bool, UUID, datetime, type(None))
+
+MANAGER_ID: Final[UserId] = make_user_id("cccccccc-1111-1111-1111-111111111111")
+"""Somebody on the staff side, distinct from the customer of every order here."""
 
 
 def test_placing_an_order_starts_it_new_and_announces_it() -> None:
@@ -59,7 +61,6 @@ def test_an_order_without_lines_is_refused() -> None:
     with pytest.raises(EmptyOrderError):
         Order.place(
             order_id=make_order_id(),
-            order_number=make_order_number(),
             events_collection=make_events_collection(),
             placement=make_placement(lines=()),
         )
@@ -75,7 +76,6 @@ def test_an_order_mixing_currencies_is_refused() -> None:
     with pytest.raises(CurrencyMismatchError):
         Order.place(
             order_id=make_order_id(),
-            order_number=make_order_number(),
             events_collection=make_events_collection(),
             placement=make_placement(lines=lines),
         )
@@ -119,7 +119,7 @@ def test_placing_an_order_announces_it_with_primitives() -> None:
 
     assert isinstance(placed, OrderPlaced)
     assert placed.order_id == order.id
-    assert placed.order_number == ORDER_NUMBER
+    assert placed.order_number == str(order.number)
     assert placed.customer_id == make_user_id()
     assert placed.price_type_id == PRICE_TYPE_ID
     assert placed.total_amount == "59.97"
@@ -253,10 +253,14 @@ def test_a_customer_may_withdraw_an_order_that_has_not_left_the_shop(
     order, collection = make_order(status=status)
     drain(collection)
 
-    order.cancel(initiated_by=CancellationInitiator.CUSTOMER)
+    order.cancel(
+        initiated_by=CancellationInitiator.CUSTOMER,
+        cancelled_by_user_id=order.customer_id,
+    )
 
     assert order.status is OrderStatus.CANCELLED
     assert order.cancelled_by is CancellationInitiator.CUSTOMER
+    assert order.cancelled_by_user_id == order.customer_id
     assert order.cancellation_reason is None
     assert emitted_event_names(collection) == ["OrderStatusChanged"]
 
@@ -272,7 +276,10 @@ def test_a_customer_cannot_withdraw_an_order_that_is_already_on_its_way(
     order, _ = make_order(status=status)
 
     with pytest.raises(CustomerCannotCancelProcessedOrderError):
-        order.cancel(initiated_by=CancellationInitiator.CUSTOMER)
+        order.cancel(
+            initiated_by=CancellationInitiator.CUSTOMER,
+            cancelled_by_user_id=order.customer_id,
+        )
 
 
 @pytest.mark.parametrize(
@@ -285,10 +292,15 @@ def test_a_manager_may_stop_any_unfinished_order(status: OrderStatus) -> None:
     drain(collection)
     reason = CancellationReason(value="Товара не оказалось на складе")
 
-    order.cancel(initiated_by=CancellationInitiator.MANAGER, reason=reason)
+    order.cancel(
+        initiated_by=CancellationInitiator.MANAGER,
+        cancelled_by_user_id=MANAGER_ID,
+        reason=reason,
+    )
 
     assert order.status is OrderStatus.CANCELLED
     assert order.cancellation_reason == reason
+    assert order.cancelled_by_user_id == MANAGER_ID
     assert emitted_event_names(collection) == ["OrderStatusChanged"]
 
 
@@ -300,7 +312,11 @@ def test_a_finished_order_cannot_be_cancelled_even_by_a_manager(
     reason = CancellationReason(value="Передумали")
 
     with pytest.raises(OrderStatusTransitionError):
-        order.cancel(initiated_by=CancellationInitiator.MANAGER, reason=reason)
+        order.cancel(
+            initiated_by=CancellationInitiator.MANAGER,
+            cancelled_by_user_id=MANAGER_ID,
+            reason=reason,
+        )
 
 
 def test_a_manager_has_to_say_why() -> None:
@@ -308,7 +324,10 @@ def test_a_manager_has_to_say_why() -> None:
     order, _ = make_order()
 
     with pytest.raises(CancellationReasonRequiredError):
-        order.cancel(initiated_by=CancellationInitiator.MANAGER)
+        order.cancel(
+            initiated_by=CancellationInitiator.MANAGER,
+            cancelled_by_user_id=MANAGER_ID,
+        )
 
 
 def test_a_cancellation_announces_the_move_and_the_reason() -> None:
@@ -316,13 +335,14 @@ def test_a_cancellation_announces_the_move_and_the_reason() -> None:
 
     Who cancelled does not: ``confirm``, ``ship`` and ``complete`` take no
     arguments and would have nothing to fill such a field from, so the author
-    stays on the aggregate as ``cancelled_by``.
+    stays on the aggregate as ``cancelled_by`` and ``cancelled_by_user_id``.
     """
     order, collection = make_order()
     drain(collection)
 
     order.cancel(
         initiated_by=CancellationInitiator.MANAGER,
+        cancelled_by_user_id=MANAGER_ID,
         reason=CancellationReason(value="Нет на складе"),
     )
 
@@ -332,6 +352,7 @@ def test_a_cancellation_announces_the_move_and_the_reason() -> None:
     assert cancelled.new_status == "cancelled"
     assert cancelled.reason == "Нет на складе"
     assert order.cancelled_by is CancellationInitiator.MANAGER
+    assert order.cancelled_by_user_id == MANAGER_ID
 
 
 @pytest.mark.parametrize("status", (OrderStatus.NEW, OrderStatus.CONFIRMED))

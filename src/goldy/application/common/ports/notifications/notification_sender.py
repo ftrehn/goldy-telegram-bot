@@ -26,16 +26,18 @@ class NotificationSender(Protocol):
     """Delivers a rendered notification through one messenger.
 
     :attr:`platform` is part of the port rather than a fact about the adapter,
-    because the caller has to know: a person whose notification target is MAX
-    must be skipped by a Telegram sender rather than written to at an id that
-    means something else there.
+    because the dispatcher picks a sender by it: a person whose notification
+    target is MAX is written to by the MAX sender and by nothing else, so a
+    Telegram id is never mistaken for an id that means something else there.
 
-    ``send`` answers whether the message arrived instead of raising when it did
-    not. Somebody blocking the bot is an ordinary answer from Telegram and not
-    an incident — it must not abort a batch, and it must not make the broker
-    redeliver the message so the remaining recipients are written to twice.
-    Failures that *are* worth retrying — a timeout, a 5xx, a flood wait — stay
-    exceptions and reach the caller as an ``InfrastructureError``.
+    ``send`` returns nothing and raises when the message did not arrive. Two
+    kinds of failure, two errors. Somebody having blocked the bot is an answer
+    the messenger will give again tomorrow, and it is reported as
+    ``NotificationUndeliverableError`` so the dispatcher can count the person
+    as skipped and go on to the next one. A timeout, a 5xx, a flood wait are
+    worth another go and reach the caller as an ``InfrastructureError``,
+    because raising all the way out is what puts the broker message back for
+    redelivery.
     """
 
     @property
@@ -45,6 +47,14 @@ class NotificationSender(Protocol):
         raise NotImplementedError
 
     @abstractmethod
-    async def send(self, notification: OutgoingNotification) -> bool:
-        """True when delivered, False when the account cannot be reached."""
+    async def send(self, notification: OutgoingNotification) -> None:
+        """Writes the message to the account.
+
+        Raises:
+            NotificationUndeliverableError: the account cannot be written to,
+                now or on any retry — the person blocked the bot, deleted the
+                account, the chat is gone.
+            InfrastructureError: the messenger could not be reached and a
+                later attempt may well succeed.
+        """
         raise NotImplementedError

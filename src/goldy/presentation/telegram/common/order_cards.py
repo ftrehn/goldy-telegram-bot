@@ -173,6 +173,8 @@ def order_card_data(
         "is_open": not order.is_terminal,
         "is_cancelled": order.cancelled_by is not None,
         "cancelled_by": for_message_text(order.cancelled_by or ""),
+        "has_canceller_name": order.cancelled_by_name is not None,
+        "canceller_name": for_message_text(order.cancelled_by_name or ""),
         "has_reason": bool(order.cancellation_reason),
         "reason": for_message_text(order.cancellation_reason or ""),
     }

@@ -9,7 +9,7 @@ from goldy.application.common.mediator.markers import Command
 class NotifyOrderPlacedCommand(Command[NotificationOutcome]):
     """Tell the people who work here that a new order is waiting.
 
-    Two fields, and the second one is the whole design. ``OrderPlaced`` carries
+    Three fields, and the last one is the whole design. ``OrderPlaced`` carries
     a total, a currency and a line count, and none of them is taken from the
     event: what a manager needs in the message is who ordered, where it goes
     and how to ring them, and those were deliberately kept out of the event so
@@ -19,7 +19,11 @@ class NotifyOrderPlacedCommand(Command[NotificationOutcome]):
 
     :attr:`message_id` is ``OutboxMessage.id`` — the broker's ``message_id``,
     stable across every redelivery, and the only thing the inbox keys off.
+    :attr:`event_type` is the name the message was published under, carried
+    by whoever received it so the inbox records what the claim was for; the
+    handler does not guess it from a class it happens to import.
     """
 
     message_id: UUID
+    event_type: str
     order_id: UUID

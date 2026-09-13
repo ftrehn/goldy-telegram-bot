@@ -52,14 +52,35 @@ class Money(ValueObject):
         Raises:
             CurrencyMismatchError: the two amounts are in different currencies.
         """
-        if other.currency is not self.currency:
-            msg = (
-                f"Cannot add {other.currency.value} to {self.currency.value} — "
-                f"amounts in different currencies are not comparable."
-            )
-            raise CurrencyMismatchError(msg)
+        self._ensure_same_currency(other, "add")
 
         return type(self)(self.amount + other.amount, self.currency)
+
+    def __sub__(self, other: Self) -> Self:
+        """Takes one amount off another, in the same currency.
+
+        Money is shared between contexts — a line total, an order total, one
+        day a balance — and whoever adds two amounts eventually has to take one
+        back. The result is validated like any other amount, so going below
+        zero is refused by ``NegativeMoneyAmountError`` rather than producing a
+        debt nobody modelled.
+
+        Raises:
+            CurrencyMismatchError: the two amounts are in different currencies.
+            NegativeMoneyAmountError: ``other`` is more than there is.
+        """
+        self._ensure_same_currency(other, "subtract")
+
+        return type(self)(self.amount - other.amount, self.currency)
+
+    def _ensure_same_currency(self, other: Self, operation: str) -> None:
+        if other.currency is not self.currency:
+            msg = (
+                f"Cannot {operation} {other.currency.value} and "
+                f"{self.currency.value} — amounts in different currencies "
+                f"are not comparable."
+            )
+            raise CurrencyMismatchError(msg)
 
     @override
     def _validate(self) -> None:

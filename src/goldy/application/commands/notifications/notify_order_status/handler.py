@@ -1,7 +1,6 @@
 import logging
 from typing import Final, override
 
-from goldy.application.commands.notifications import text_keys
 from goldy.application.commands.notifications.dispatcher import NotificationDispatcher
 from goldy.application.commands.notifications.notify_order_status.command import (
     NotifyOrderStatusChangedCommand,
@@ -10,10 +9,9 @@ from goldy.application.commands.notifications.outcome import NotificationOutcome
 from goldy.application.common.mediator.handlers import CommandHandler
 from goldy.application.common.ports.notifications import (
     InboxGateway,
-    NotificationText,
+    OrderStatusChangedNotification,
 )
 from goldy.application.common.ports.users import UserQueryGateway
-from goldy.domain.orders.events import OrderStatusChanged
 from goldy.domain.users.values.user_id import UserId
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
@@ -51,10 +49,7 @@ class NotifyOrderStatusChangedHandler(
         self,
         command: NotifyOrderStatusChangedCommand,
     ) -> NotificationOutcome:
-        claimed = await self._inbox_gateway.claim(
-            command.message_id,
-            OrderStatusChanged.__name__,
-        )
+        claimed = await self._inbox_gateway.claim(command.message_id, command.event_type)
 
         if not claimed:
             logger.info(
@@ -77,7 +72,11 @@ class NotifyOrderStatusChangedHandler(
 
         outcome = await self._dispatcher.dispatch_to_all(
             [customer],
-            _status_changed_text(command),
+            OrderStatusChangedNotification(
+                number=command.order_number,
+                status=command.new_status,
+                reason=command.reason,
+            ),
         )
 
         logger.info(
@@ -88,26 +87,3 @@ class NotifyOrderStatusChangedHandler(
             outcome.skipped,
         )
         return outcome
-
-
-def _status_changed_text(command: NotifyOrderStatusChangedCommand) -> NotificationText:
-    """Two keys, chosen by whether there is a reason to print.
-
-    Not one message with a Fluent selector. A selector would still have to be
-    handed ``reason`` on every render, and an argument a placeholder expects
-    and does not get raises rather than showing up as text.
-    """
-    if command.reason is None:
-        return NotificationText(
-            key=text_keys.NOTIFICATION_ORDER_STATUS_CHANGED,
-            args={"number": command.order_number, "status": command.new_status},
-        )
-
-    return NotificationText(
-        key=text_keys.NOTIFICATION_ORDER_STATUS_CHANGED_REASON,
-        args={
-            "number": command.order_number,
-            "status": command.new_status,
-            "reason": command.reason,
-        },
-    )

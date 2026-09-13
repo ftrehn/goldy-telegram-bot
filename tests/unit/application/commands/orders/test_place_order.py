@@ -17,17 +17,17 @@ from goldy.domain.common.events_collection import EventsCollection
 from goldy.domain.orders.errors import UnpricedCartLineError
 from goldy.domain.orders.events import OrderPlaced
 from tests.unit.application.conftest import ActingAs, UserSeeder
-from tests.unit.factories.catalog_factories import make_price_type_view
+from tests.unit.factories.catalog_factories import make_resolved_price_type
 from tests.unit.factories.domain_factories import CUSTOMER_PHONE
-from tests.unit.factories.order_factories import make_priced_product_view
 from tests.unit.factories.shop_factories import (
     DELIVERY_ADDRESS,
     PRICE_TYPE_ID,
     RECIPIENT_FIRST_NAME,
     RECIPIENT_LAST_NAME,
+    make_priced_product,
+    make_product_id,
 )
-from tests.unit.stubs.catalog import StubPricingGateway
-from tests.unit.stubs.generators import StubOrderNumberGenerator
+from tests.unit.stubs.catalog import StubPricingReader
 from tests.unit.stubs.orders import InMemoryOrderCommandGateway
 
 from .conftest import CartSeeder
@@ -58,16 +58,16 @@ async def test_the_cart_becomes_an_order_at_the_prices_just_read(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     order_gateway: InMemoryOrderCommandGateway,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
     customer = await seed_user()
     acting_as(customer.id)
     cart = seed_cart(customer.id, CART)
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
 
     view = await place_order_handler.handle(place_order())
@@ -85,16 +85,16 @@ async def test_the_order_records_that_it_was_placed(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     events_collection: EventsCollection,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, CART)
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
 
     await place_order_handler.handle(place_order())
@@ -113,7 +113,7 @@ async def test_a_total_that_moved_since_the_screen_refuses_the_order(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     order_gateway: InMemoryOrderCommandGateway,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
@@ -121,9 +121,9 @@ async def test_a_total_that_moved_since_the_screen_refuses_the_order(
     customer = await seed_user()
     acting_as(customer.id)
     cart = seed_cart(customer.id, CART)
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1, price="29.99"),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1, price="29.99"),
+        make_priced_product(2),
     )
 
     with pytest.raises(CartRepricedError):
@@ -137,16 +137,16 @@ async def test_a_line_count_that_moved_since_the_screen_refuses_the_order(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     order_gateway: InMemoryOrderCommandGateway,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, CART)
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
 
     with pytest.raises(CartRepricedError):
@@ -159,7 +159,7 @@ async def test_a_price_that_did_not_move_is_not_a_repricing(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     order_gateway: InMemoryOrderCommandGateway,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
@@ -167,9 +167,9 @@ async def test_a_price_that_did_not_move_is_not_a_repricing(
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, CART)
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
 
     await place_order_handler.handle(place_order(total="59.970"))
@@ -181,7 +181,7 @@ async def test_a_second_confirmation_tap_meets_an_empty_cart(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     order_gateway: InMemoryOrderCommandGateway,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
@@ -197,9 +197,9 @@ async def test_a_second_confirmation_tap_meets_an_empty_cart(
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, CART)
-    pricing_gateway.priced_products = (
-        make_priced_product_view(1),
-        make_priced_product_view(2),
+    pricing_reader.priced_products = (
+        make_priced_product(1),
+        make_priced_product(2),
     )
     await place_order_handler.handle(place_order())
 
@@ -213,33 +213,33 @@ async def test_a_product_that_left_the_catalog_names_the_line(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
-    order_number_generator: StubOrderNumberGenerator,
+    pricing_reader: StubPricingReader,
+    order_gateway: InMemoryOrderCommandGateway,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
     """A vanished product is not a repricing, and must not be reported as one."""
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, CART)
-    pricing_gateway.priced_products = (make_priced_product_view(1),)
+    pricing_reader.priced_products = (make_priced_product(1),)
 
     with pytest.raises(UnpricedCartLineError):
         await place_order_handler.handle(place_order())
 
-    assert order_number_generator.calls == 0
+    assert order_gateway.added == []
 
 
 async def test_a_product_shown_as_price_on_request_cannot_be_ordered(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, {1: 1})
-    pricing_gateway.priced_products = (make_priced_product_view(1, price=None),)
+    pricing_reader.unpriced_product_ids = (make_product_id(1),)
 
     with pytest.raises(ProductNotPricedError):
         await place_order_handler.handle(place_order(line_count=1))
@@ -249,13 +249,13 @@ async def test_a_shop_with_no_price_list_at_all_refuses(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, {1: 1})
-    pricing_gateway.price_type = None
+    pricing_reader.price_type = None
 
     with pytest.raises(PriceTypeNotConfiguredError):
         await place_order_handler.handle(place_order(line_count=1))
@@ -265,14 +265,14 @@ async def test_a_price_list_in_an_unknown_currency_refuses(
     seed_user: UserSeeder,
     acting_as: ActingAs,
     seed_cart: CartSeeder,
-    pricing_gateway: StubPricingGateway,
+    pricing_reader: StubPricingReader,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
     """Falling back to the default list here would show somebody else's prices."""
     customer = await seed_user()
     acting_as(customer.id)
     seed_cart(customer.id, {1: 1})
-    pricing_gateway.price_type = make_price_type_view(is_supported=False)
+    pricing_reader.price_type = make_resolved_price_type(is_supported=False)
 
     with pytest.raises(UnsupportedPriceTypeError):
         await place_order_handler.handle(place_order(line_count=1))
@@ -281,12 +281,12 @@ async def test_a_price_list_in_an_unknown_currency_refuses(
 async def test_an_empty_cart_is_refused_before_anything_is_minted(
     seed_user: UserSeeder,
     acting_as: ActingAs,
-    order_number_generator: StubOrderNumberGenerator,
+    order_gateway: InMemoryOrderCommandGateway,
     place_order_handler: PlaceOrderHandler,
 ) -> None:
     """Somebody who never added anything has no cart row at all.
 
-    ``ensure_for`` creating one on the spot must not turn that into an order.
+    ``CartProvider`` starting one on the spot must not turn that into an order.
     """
     customer = await seed_user()
     acting_as(customer.id)
@@ -294,4 +294,4 @@ async def test_an_empty_cart_is_refused_before_anything_is_minted(
     with pytest.raises(EmptyCartError):
         await place_order_handler.handle(place_order())
 
-    assert order_number_generator.calls == 0
+    assert order_gateway.added == []

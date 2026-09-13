@@ -97,43 +97,39 @@ python -m goldy.telegram_bot
 файл» не означает «переменные из него попали в процесс». Файл `.env` без
 дополнительного шага — просто файл на диске.
 
-Единственное, что этот шаг сейчас делает сама по себе, — команды `just migration`,
-`just migrate*`: заглянув в `justfile`, видно, что они идут через
-`uv run --active dotenv -f .env run -- alembic ...`, то есть `.env` в окружение
-подмешивает пакет `python-dotenv`, вызванный явно. У `python -m goldy.telegram_bot`,
-`taskiq worker ...`, `taskiq scheduler ...` и сидера такой обёртки нет.
+Загрузку файла в процесс берут на себя рецепты `justfile`: `just bot`,
+`just worker`, `just scheduler` и `just seed <файл>` запускают каждый процесс
+через `dotenv -f .env run -- ...` — тот же `python-dotenv`, которым уже
+пользуются `just migration` и `just migrate*`. Рецепты одинаково работают на
+Windows и на Linux, потому что `just` сам выбирает оболочку под систему, а
+`dotenv` — консольная команда пакета, который и так стоит в окружении. Отдельного
+скрипта под каждую оболочку у проекта нет намеренно: два скрипта — это два
+места, где список переменных расходится.
 
-На Windows с PowerShell это делает `scripts\run-with-env.ps1`: он раскладывает
-`.env` по переменным окружения текущего процесса PowerShell и запускает один из
-процессов проекта.
-
-```powershell
-.\scripts\run-with-env.ps1 -Process bot -EnvFile .env
-.\scripts\run-with-env.ps1 -Process worker -EnvFile .env
-.\scripts\run-with-env.ps1 -Process scheduler -EnvFile .env
-.\scripts\run-with-env.ps1 -Process seed -EnvFile .env -CatalogFile docs/design/catalog-snapshot.example.json
+```sh
+just bot
+just worker
+just scheduler
+just seed docs/design/catalog-snapshot.example.json
 ```
 
-Выбор процесса по имени, а не приём произвольной командной строки, —
-осознанное решение, а не недоделка: собственный разбор параметров PowerShell
-перехватывает любой токен вида `-что-то` как попытку сопоставить его с
-параметром скрипта раньше, чем тот дойдёт до вашей команды, и флаг вроде `-c`
-у передаваемой программы можно молча принять за сокращение чужого параметра.
-Закрытый список известных процессов эту ловушку убирает целиком.
+Другой файл окружения передаётся вторым аргументом: `just bot .env.dev.example`.
+`just` ставится одной командой на любую систему —
+[casey/just](https://github.com/casey/just), на Windows проще всего через
+`winget install Casey.Just`, `scoop install just` или `uv tool install rust-just`.
 
-`.ps1`-скрипт выполняется в том же процессе PowerShell, что и вызвавшая его
-сессия — новую область видимости PowerShell даёт только переменным, а не
-переменным окружения ОС, — поэтому вызванные им `SetEnvironmentVariable`
-остаются в сессии и после того, как скрипт закончил работу: можно продолжать
-работать в том же окне обычными командами.
-
-На bash/zsh (Linux, macOS, WSL) готового скрипта нет, но задача решается одной
-строкой без сторонних инструментов — так же, как это делает `justfile`, только
-явно, без `dotenv`:
+Без `just` то же самое делается вручную. На bash/zsh (Linux, macOS, WSL) —
+одной строкой без сторонних инструментов:
 
 ```sh
 set -a; . ./.env; set +a
 python -m goldy.telegram_bot
+```
+
+На PowerShell та же цепочка — через `dotenv`, который стоит в окружении проекта:
+
+```powershell
+uv run --active dotenv -f .env run -- python -m goldy.telegram_bot
 ```
 
 `.env.example` и `.env.dev.example` перечисляют все переменные с комментариями.

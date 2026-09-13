@@ -32,9 +32,9 @@ from goldy.presentation.telegram.handlers.catalog.deeplinks import (
 )
 from goldy.presentation.telegram.handlers.catalog.getters import (
     ORIGIN_KEY,
-    PRODUCTS_PAGE_KEY,
+    PRODUCTS_SCROLL_ID,
     PRODUCT_ID_KEY,
-    RESULTS_PAGE_KEY,
+    RESULTS_SCROLL_ID,
     SORT_KEY,
     TERM_KEY,
     category_path,
@@ -133,7 +133,7 @@ async def on_category_selected(
     """
     path = category_path(manager)
     path.append([item_id, level_names(manager).get(item_id, item_id)])
-    reset_paging(manager, key=PRODUCTS_PAGE_KEY)
+    await reset_paging(manager, scroll_id=PRODUCTS_SCROLL_ID)
 
 
 async def on_category_up(
@@ -147,7 +147,7 @@ async def on_category_up(
     if path:
         path.pop()
 
-    reset_paging(manager, key=PRODUCTS_PAGE_KEY)
+    await reset_paging(manager, scroll_id=PRODUCTS_SCROLL_ID)
 
 
 async def on_show_products(
@@ -156,7 +156,7 @@ async def on_show_products(
     manager: DialogManager,
 ) -> None:
     """Opens the listing of the group on screen, always at its first page."""
-    reset_paging(manager, key=PRODUCTS_PAGE_KEY)
+    await reset_paging(manager, scroll_id=PRODUCTS_SCROLL_ID)
 
 
 async def on_sort_toggled(
@@ -177,7 +177,7 @@ async def on_sort_toggled(
         else ProductSortField.NAME
     )
     manager.dialog_data[SORT_KEY] = flipped.value
-    reset_paging(manager, key=PRODUCTS_PAGE_KEY)
+    await reset_paging(manager, scroll_id=PRODUCTS_SCROLL_ID)
 
 
 async def on_product_selected(
@@ -266,7 +266,7 @@ async def on_search_typed(
     """
     term = (message.text or "").strip()
     manager.dialog_data[TERM_KEY] = term
-    reset_paging(manager, key=RESULTS_PAGE_KEY)
+    await reset_paging(manager, scroll_id=RESULTS_SCROLL_ID)
 
     product_id = await exact_match_product_id(sender, term)
 
@@ -275,14 +275,6 @@ async def on_search_typed(
         return
 
     await _open_card(manager, product_id=product_id, origin=RESULTS_ORIGIN)
-
-
-async def on_close(
-    _callback: CallbackQuery,
-    _widget: Button,
-    manager: DialogManager,
-) -> None:
-    await manager.done()
 
 
 async def exact_match_product_id(sender: Sender, term: str) -> str | None:

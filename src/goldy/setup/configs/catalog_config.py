@@ -13,10 +13,13 @@ class CatalogConfig:
 
     Attributes:
         default_price_type_id: The price list shown to a customer the catalog
-            holds no binding for. Kept as the raw identifier because a config
-            object reads the environment and nothing more; turning it into a
-            ``PriceTypeId`` is the composition root's job, the same way parsed
-            administrator numbers reach ``StaticAdminRegistry``.
+            holds no binding for. Required, with no default: an empty value
+            would reach the pricing reader as an identifier matching no row,
+            and the first customer without a binding would be told their
+            price list is not configured. Kept as the raw identifier because
+            a config object reads the environment and nothing more; turning
+            it into a ``PriceTypeId`` is the composition root's job, the same
+            way parsed administrator numbers reach ``StaticAdminRegistry``.
     """
 
-    default_price_type_id: str = ""
+    default_price_type_id: str

@@ -6,8 +6,6 @@ if TYPE_CHECKING:
 
     from goldy.application.common.views.catalog import (
         CategoryView,
-        PriceTypeView,
-        PricedProductView,
         ProductListItemView,
         ProductView,
     )
@@ -27,10 +25,12 @@ class CatalogRowViewMapper(Protocol):
 
     The key names below are the contract between this mapper and the gateways
     that feed it, and they are the plain column names wherever a query can use
-    them. Three are labelled because the plain name would be ambiguous:
-    ``stock`` is a sum over warehouses rather than a column, ``category_name``
-    would collide with the product's own ``name``, and ``product_id`` says
-    which id a priced row is about.
+    them. Two are labelled because the plain name would be ambiguous:
+    ``stock`` is a sum over warehouses rather than a column, and
+    ``category_name`` would collide with the product's own ``name``.
+
+    Views only. The rows the checkout reads with the intent to keep them are
+    built into domain values by ``PricingRowMapper`` instead.
     """
 
     @abstractmethod
@@ -46,14 +46,4 @@ class CatalogRowViewMapper(Protocol):
     @abstractmethod
     def to_product_view(self, row: RowMapping) -> ProductView:
         """Reads the whole card, plus ``category_name``, the price and ``stock``."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_priced_product_view(self, row: RowMapping) -> PricedProductView:
-        """Reads ``product_id``, ``sku``, ``name``, the unit and the price."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_price_type_view(self, row: RowMapping) -> PriceTypeView:
-        """Reads ``price_type_id`` and ``is_supported``."""
         raise NotImplementedError

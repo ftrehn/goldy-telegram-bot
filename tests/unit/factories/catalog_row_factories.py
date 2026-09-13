@@ -121,16 +121,20 @@ def make_priced_product_row(
     index: int = 1,
     price: str | None = UNIT_PRICE,
     currency: Currency = Currency.RUB,
-    *,
-    with_sku: bool = True,
+    name: str = "Product",
 ) -> RowMapping:
-    """One row of the pricing query, on its way to becoming an order line."""
+    """One row of the pricing query, on its way to becoming an order line.
+
+    ``price=None`` is the row the outer join produces for a product the price
+    list skips; the reader reports such a row as unpriced and never hands it
+    to the mapper.
+    """
     return cast(
         "RowMapping",
         {
             "product_id": make_product_id_value(index),
-            "sku": f"SKU-{index}" if with_sku else None,
-            "name": f"Product {index}",
+            "sku": f"SKU-{index}",
+            "name": f"{name} {index}",
             "unit_id": UNIT_SOURCE_ID,
             "unit_name": UNIT_NAME,
             "amount": None if price is None else Decimal(price),

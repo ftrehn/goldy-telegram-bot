@@ -9,9 +9,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goldy.application.common.ports.carts import CartQueryGateway
-from goldy.application.common.views.cart import CartLineView, CartView
-from goldy.application.common.views.money import MoneyView
+from goldy.application.common.views.cart import CartView
 from goldy.infrastructure.errors import RepoError
+from goldy.infrastructure.mappers.cart_row_view_mapper import CartRowViewMapper
 from goldy.infrastructure.persistence.models import (
     cart_items_table,
     carts_table,
@@ -50,15 +50,18 @@ class SqlAlchemyCartQueryGateway(CartQueryGateway):
     disagreed, "remove unavailable" would either take a line the screen showed
     as fine or leave one it showed as broken.
 
-    The views are built here rather than by a row mapper of their own. The
-    user read model needs one because its accounts arrive from a second query
-    and are grafted onto rows the same mapper also serves the admin list with;
-    a cart is one query feeding one view, and a port for it would be an extra
-    thing to wire for no second caller.
+    The rows become a view in ``CartRowViewMapper``, injected like every other
+    row mapper: this class knows the query, the mapper knows the shape, and
+    neither has to change for the other.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        cart_row_view_mapper: CartRowViewMapper,
+    ) -> None:
         self._session: Final[AsyncSession] = session
+        self._mapper: Final[CartRowViewMapper] = cart_row_view_mapper
 
     @override
     async def read_for(
@@ -71,10 +74,7 @@ class SqlAlchemyCartQueryGateway(CartQueryGateway):
         if cart_id is None:
             return None
 
-        rows = await self._read_lines(cart_id, price_type_id)
-        lines = tuple(self._to_line_view(row) for row in rows)
-
-        return CartView(lines=lines, total=self._total_of(lines))
+        return self._mapper.to_cart_view(await self._read_lines(cart_id, price_type_id))
 
     async def _cart_id_of(self, user_id: UserId) -> UUID | None:
         """Tells "no cart at all" from "a cart with nothing in it".
@@ -153,64 +153,4 @@ class SqlAlchemyCartQueryGateway(CartQueryGateway):
             .correlate(cart_items_table)
             .scalar_subquery()
             .label("stock")
-        )
-
-    def _to_line_view(self, row: RowMapping) -> CartLineView:
-        """Flattens one joined row, unwrapping what the type decorators built.
-
-        Only two columns need unwrapping, and which two is not obvious: the
-        cart's own ``product_id`` and ``quantity`` carry type decorators and
-        arrive as value objects, while everything joined in comes from the
-        projection, which is Core-only and hands back plain text and numbers.
-
-        ``amount`` being NULL is an ordinary state and not a defect: this
-        customer's price type simply prices no such product. The line keeps its
-        quantity and loses its price, the screen prints "price on request", and
-        the total below counts what it can — printing a zero would read as
-        "free".
-        """
-        quantity: int = row["quantity"].value
-        amount: Decimal | None = row["amount"]
-        currency: str | None = row["currency"]
-
-        unit_price = (
-            MoneyView(amount=amount, currency=currency)
-            if amount is not None and currency is not None
-            else None
-        )
-        line_total = (
-            MoneyView(amount=amount * quantity, currency=currency)
-            if amount is not None and currency is not None
-            else None
-        )
-
-        return CartLineView(
-            product_id=row["product_id"].value,
-            sku=row["sku"],
-            name=row["name"],
-            unit_name=row["unit_name"],
-            quantity=quantity,
-            unit_price=unit_price,
-            line_total=line_total,
-            stock=row["stock"],
-            is_available=bool(row["is_active"]),
-        )
-
-    def _total_of(self, lines: Sequence[CartLineView]) -> MoneyView:
-        """Adds up the lines that have a price, in the currency they share.
-
-        Every price in the cart comes from one price type, and a price type is
-        denominated in exactly one currency, so taking the currency off the
-        first priced line cannot mix two. An unpriced line contributes nothing
-        and is counted by ``CartView.has_unpriced_lines`` instead, which is
-        what keeps "checkout" from being offered on a total that is short.
-        """
-        totals = [line.line_total for line in lines if line.line_total is not None]
-
-        if not totals:
-            return MoneyView.zero()
-
-        return MoneyView(
-            amount=sum((total.amount for total in totals), start=Decimal("0.00")),
-            currency=totals[0].currency,
         )

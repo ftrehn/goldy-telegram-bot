@@ -23,6 +23,8 @@ from goldy.application.commands.notifications.notify_order_status.command import
 from goldy.application.commands.notifications.notify_order_status.handler import (
     NotifyOrderStatusChangedHandler,
 )
+from goldy.application.error import NotificationChannelUnavailableError
+from goldy.domain.orders.events import OrderDeliveryAddressChanged, OrderStatusChanged
 from goldy.domain.orders.values.order_status import OrderStatus
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
 from goldy.domain.users.values.user_role import UserRole
@@ -49,6 +51,7 @@ def a_status_change(
 ) -> NotifyOrderStatusChangedCommand:
     return NotifyOrderStatusChangedCommand(
         message_id=MESSAGE_ID,
+        event_type=OrderStatusChanged.__name__,
         order_number=ORDER_NUMBER,
         customer_id=UUID(customer_id),
         new_status=status.value,
@@ -61,6 +64,7 @@ def an_address_change(
 ) -> NotifyDeliveryAddressChangedCommand:
     return NotifyDeliveryAddressChangedCommand(
         message_id=OTHER_MESSAGE_ID,
+        event_type=OrderDeliveryAddressChanged.__name__,
         order_number=ORDER_NUMBER,
         customer_id=UUID(customer_id),
         old_address=OLD_ADDRESS,
@@ -132,6 +136,7 @@ async def test_an_unknown_status_is_printed_rather_than_guessed(
     await notify_status_changed.handle(
         NotifyOrderStatusChangedCommand(
             message_id=MESSAGE_ID,
+            event_type=OrderStatusChanged.__name__,
             order_number=ORDER_NUMBER,
             customer_id=UUID(CUSTOMER_ID),
             new_status="awaiting_pickup",
@@ -177,11 +182,17 @@ async def test_a_blocked_customer_is_not_written_to(
     assert MESSAGE_ID in inbox.claimed
 
 
-async def test_a_customer_who_asked_for_max_is_not_reached_on_telegram(
+async def test_a_customer_on_a_messenger_this_worker_cannot_reach_is_refused_loudly(
     seed_user: UserSeeder,
     notify_status_changed: NotifyOrderStatusChangedHandler,
     sender: RecordingNotificationSender,
 ) -> None:
+    """Not a skip: a target nobody can write to is a deployment mistake.
+
+    The message stays on the broker until a MAX sender is deployed, and the
+    Telegram id on file is never used in its place — that would make the
+    setting decorative.
+    """
     seed_user(
         CUSTOMER_ID,
         UserRole.CUSTOMER,
@@ -189,9 +200,9 @@ async def test_a_customer_who_asked_for_max_is_not_reached_on_telegram(
         notify_via=MessengerPlatform.MAX,
     )
 
-    outcome = await notify_status_changed.handle(a_status_change())
+    with pytest.raises(NotificationChannelUnavailableError):
+        await notify_status_changed.handle(a_status_change())
 
-    assert outcome.skipped == 1
     assert sender.sent == []
 
 

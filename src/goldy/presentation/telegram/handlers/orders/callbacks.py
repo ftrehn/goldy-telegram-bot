@@ -145,11 +145,3 @@ async def on_repeat_confirmed(
     manager.dialog_data[REPEAT_MOVED_KEY] = view.moved_line_count
     manager.dialog_data[REPEAT_SKIPPED_KEY] = list(view.skipped_product_names)
     await manager.switch_to(OrdersStates.REPEAT_RESULT)
-
-
-async def on_close(
-    _callback: CallbackQuery,
-    _widget: Button,
-    manager: DialogManager,
-) -> None:
-    await manager.done()

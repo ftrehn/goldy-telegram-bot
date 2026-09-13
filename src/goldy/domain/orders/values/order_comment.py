@@ -15,6 +15,13 @@ class OrderComment(ValueObject):
     one, the way ``MessengerUsername`` is: an empty string and a missing value
     are two spellings of the same thing, and code that has to handle both
     eventually handles only one.
+
+    Five hundred characters is room for a delivery window, an entrance code
+    and a request to ring first, and it is the length the manager's card can
+    still show whole. The bound is not a secret: the screen that asks for the
+    comment states it, so a longer note is shortened by the person before it
+    is refused by this class, and ``MAX_ORDER_COMMENT_LENGTH`` is what that
+    screen reads rather than a number of its own.
     """
 
     value: str

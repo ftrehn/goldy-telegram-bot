@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -23,7 +24,7 @@ class OrderLineView:
 
     position: int
     product_id: str
-    sku: str | None
+    sku: str
     name: str
     unit_name: str
     quantity: int
@@ -52,6 +53,15 @@ class OrderView:
     Blocking is about access rather than about obligations, and an order placed
     before the block can perfectly well go on to be confirmed — the queue draws
     a badge and the person decides.
+
+    :attr:`cancelled_by` is the side that stopped the order — ``customer`` or
+    ``manager``, the values of ``CancellationInitiator`` — and
+    :attr:`cancelled_by_user_id` is the person. The side is a slug and reads
+    as one; the person is an identifier and travels as one, and
+    :attr:`cancelled_by_name` is that person's name joined in for the staff
+    card, so a manager reading "cancelled by the shop" also reads by whom.
+    It is ``None`` when nobody cancelled and when the account behind the
+    cancellation has since been removed.
     """
 
     id: UUID
@@ -66,8 +76,10 @@ class OrderView:
     recipient_phone_number: str
     comment: str | None
     cancelled_by: str | None
+    cancelled_by_user_id: UUID | None
+    cancelled_by_name: str | None
     cancellation_reason: str | None
-    lines: tuple[OrderLineView, ...]
+    lines: Sequence[OrderLineView]
     total: MoneyView
     is_cancellable: bool
     is_editable: bool
@@ -113,8 +125,27 @@ class OrderListItemView:
 class OrderListView:
     """One page of orders together with the count the pager needs."""
 
-    orders: tuple[OrderListItemView, ...]
+    orders: Sequence[OrderListItemView]
     total: int
+
+
+@dataclass(frozen=True, slots=True)
+class LastDeliveryAddressView:
+    """Where this person's previous order went, to offer as a button.
+
+    A view around one nullable string rather than the string itself, so the
+    query answers the way every other query does — with a view — and the
+    dialog getter reads one shape for all of them. ``None`` inside is the
+    ordinary answer for somebody ordering for the first time, not a failure:
+    the address screen simply draws no button and waits for typing.
+    """
+
+    address: str | None
+
+    @property
+    def is_known(self) -> bool:
+        """Whether there is a previous address to offer at all."""
+        return self.address is not None
 
 
 @dataclass(frozen=True, slots=True)

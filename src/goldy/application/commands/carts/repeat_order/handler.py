@@ -2,8 +2,8 @@ from typing import Final, override
 
 from goldy.application.commands.carts.repeat_order.command import RepeatOrderCommand
 from goldy.application.common.mediator.handlers import CommandHandler
-from goldy.application.common.ports.carts import CartCommandGateway
 from goldy.application.common.ports.orders import OrderCommandGateway
+from goldy.application.common.services.cart_provider import CartProvider
 from goldy.application.common.services.purchasable_products_service import (
     PurchasableProductsService,
 )
@@ -62,13 +62,13 @@ class RepeatOrderHandler(CommandHandler[RepeatOrderCommand, CartRepeatView]):
         user_provider: UserProvider,
         access_service: AccessService,
         order_command_gateway: OrderCommandGateway,
-        cart_command_gateway: CartCommandGateway,
+        cart_provider: CartProvider,
         purchasable_products: PurchasableProductsService,
     ) -> None:
         self._user_provider: Final[UserProvider] = user_provider
         self._access_service: Final[AccessService] = access_service
         self._order_command_gateway: Final[OrderCommandGateway] = order_command_gateway
-        self._cart_command_gateway: Final[CartCommandGateway] = cart_command_gateway
+        self._cart_provider: Final[CartProvider] = cart_provider
         self._purchasable_products: Final[PurchasableProductsService] = (
             purchasable_products
         )
@@ -115,9 +115,10 @@ class RepeatOrderHandler(CommandHandler[RepeatOrderCommand, CartRepeatView]):
         )
 
         purchasable = await self._purchasable_products.among(
+            customer.id,
             [line.product_id for line in order.lines],
         )
-        cart = await self._cart_command_gateway.ensure_for(customer.id)
+        cart = await self._cart_provider.current_or_new()
 
         return self._merge(order, cart, purchasable)
 

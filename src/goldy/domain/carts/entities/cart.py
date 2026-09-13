@@ -8,6 +8,13 @@ from goldy.domain.carts.errors import (
     CartLineNotFoundError,
     EmptyCartError,
 )
+from goldy.domain.carts.events import (
+    CartCleared,
+    CartCreated,
+    CartItemAdded,
+    CartItemQuantityChanged,
+    CartItemRemoved,
+)
 from goldy.domain.carts.values.cart_id import CartId
 from goldy.domain.catalog.values.product_id import ProductId
 from goldy.domain.common.aggregate import Aggregate
@@ -37,15 +44,13 @@ class Cart(Aggregate[CartId]):
     again, so no "ordered cart" state exists for somebody to render one day as
     though it were still a draft.
 
-    **This aggregate records no events, and deliberately has no ``_record``.**
-    Everything an aggregate puts into its ``EventsCollection`` is drained into
-    the outbox inside the same transaction and published to RabbitMQ by the
-    relay. Somebody pressing ``+`` three times and ``-`` once would produce four
-    outbox rows and four messages nobody consumes. An event is a fact someone
-    reacts to; editing a draft is not one, and the single business fact here is
-    called ``OrderPlaced``. ``events_collection`` is inherited from
-    ``Aggregate`` because the command gateway contract hands back whole
-    aggregates — it is simply left unused.
+    Every change records an event, the way ``User`` and ``Order`` do. They are
+    facts about a draft rather than about a sale, and today nothing consumes
+    them — but an aggregate that takes an ``EventsCollection`` and writes
+    nothing into it is a promise the command gateway keeps for nobody, and the
+    day somebody wants to know which products are abandoned in carts, the
+    facts are already in the outbox. The one business fact of the whole flow
+    stays ``OrderPlaced``; these describe the draft it came from.
     """
 
     user_id: UserId
@@ -59,11 +64,13 @@ class Cart(Aggregate[CartId]):
         events_collection: EventsCollection,
         user_id: UserId,
     ) -> Self:
-        return cls(
+        cart = cls(
             id=cart_id,
             events_collection=events_collection,
             user_id=user_id,
         )
+        cart.events_collection.add_event(CartCreated(cart_id=cart_id, user_id=user_id))
+        return cart
 
     def add_item(self, product_id: ProductId, quantity: Quantity) -> None:
         """Puts a product in, or adds to what is already there.
@@ -81,20 +88,28 @@ class Cart(Aggregate[CartId]):
         """
         line = self.line_for(product_id)
 
-        if line is not None:
+        if line is None:
+            if len(self.lines) >= MAX_CART_LINES:
+                msg = (
+                    f"Cart '{self.id}' cannot hold more than "
+                    f"{MAX_CART_LINES} different products."
+                )
+                raise CartLineLimitExceededError(msg)
+
+            line = CartLine(product_id=product_id, quantity=quantity)
+            self.lines.append(line)
+        else:
             line.quantity += quantity
-            self._touch()
-            return
 
-        if len(self.lines) >= MAX_CART_LINES:
-            msg = (
-                f"Cart '{self.id}' cannot hold more than "
-                f"{MAX_CART_LINES} different products."
-            )
-            raise CartLineLimitExceededError(msg)
-
-        self.lines.append(CartLine(product_id=product_id, quantity=quantity))
-        self._touch()
+        self.updated_at = datetime.now(UTC)
+        self.events_collection.add_event(
+            CartItemAdded(
+                cart_id=self.id,
+                user_id=self.user_id,
+                product_id=product_id.value,
+                quantity=line.quantity.value,
+            ),
+        )
 
     def decrease_item(self, product_id: ProductId) -> None:
         """Takes one piece off a line, and the whole line off the last piece.
@@ -110,12 +125,11 @@ class Cart(Aggregate[CartId]):
         """
         line = self._require_line(product_id)
 
-        if line.quantity.value > 1:
-            line.quantity = Quantity(value=line.quantity.value - 1)
-        else:
-            self.lines.remove(line)
+        if line.quantity.value == 1:
+            self.remove_item(product_id)
+            return
 
-        self._touch()
+        self.set_item_quantity(product_id, Quantity(value=line.quantity.value - 1))
 
     def set_item_quantity(self, product_id: ProductId, quantity: Quantity) -> None:
         """Sets a line to an absolute quantity, as the keypad screen does.
@@ -125,7 +139,15 @@ class Cart(Aggregate[CartId]):
         """
         line = self._require_line(product_id)
         line.quantity = quantity
-        self._touch()
+        self.updated_at = datetime.now(UTC)
+        self.events_collection.add_event(
+            CartItemQuantityChanged(
+                cart_id=self.id,
+                user_id=self.user_id,
+                product_id=product_id.value,
+                quantity=quantity.value,
+            ),
+        )
 
     def remove_item(self, product_id: ProductId) -> None:
         """Takes a product out entirely.
@@ -135,20 +157,32 @@ class Cart(Aggregate[CartId]):
         """
         line = self._require_line(product_id)
         self.lines.remove(line)
-        self._touch()
+        self.updated_at = datetime.now(UTC)
+        self.events_collection.add_event(
+            CartItemRemoved(
+                cart_id=self.id,
+                user_id=self.user_id,
+                product_id=product_id.value,
+            ),
+        )
 
     def clear(self) -> None:
         """Empties the cart, idempotently.
 
-        Clearing an already empty cart does nothing rather than failing.
-        Checkout calls this, and a cart that is already in the state asked for
-        is not a reason to fail an order that otherwise went through.
+        Clearing an already empty cart does nothing rather than failing, and
+        records nothing either. Checkout calls this, and a cart that is already
+        in the state asked for is not a reason to fail an order that otherwise
+        went through — nor a fact worth announcing.
         """
         if not self.lines:
             return
 
+        line_count = len(self.lines)
         self.lines.clear()
-        self._touch()
+        self.updated_at = datetime.now(UTC)
+        self.events_collection.add_event(
+            CartCleared(cart_id=self.id, user_id=self.user_id, line_count=line_count),
+        )
 
     def ensure_not_empty(self) -> None:
         """Guards checkout.
@@ -186,6 +220,3 @@ class Cart(Aggregate[CartId]):
             raise CartLineNotFoundError(msg)
 
         return line
-
-    def _touch(self) -> None:
-        self.updated_at = datetime.now(UTC)

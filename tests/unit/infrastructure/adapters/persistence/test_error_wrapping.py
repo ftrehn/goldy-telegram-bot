@@ -35,14 +35,11 @@ from goldy.application.common.query_params.order_filters import (
 from goldy.application.common.query_params.pagination import Pagination
 from goldy.application.common.query_params.search_term import SearchTerm
 from goldy.domain.catalog.values.category_id import CategoryId
-from goldy.infrastructure.adapters.persistence import (
-    sqlalchemy_catalog_projection_gateway as projection,
-)
-from goldy.infrastructure.adapters.persistence.postgres_order_number_generator import (
-    PostgresOrderNumberGenerator,
-)
 from goldy.infrastructure.adapters.persistence.sqlalchemy_cart_query_gateway import (
     SqlAlchemyCartQueryGateway,
+)
+from goldy.infrastructure.adapters.persistence.sqlalchemy_catalog_projection_dao import (
+    SqlAlchemyCatalogProjectionDao,
 )
 from goldy.infrastructure.adapters.persistence.sqlalchemy_catalog_query_gateway import (
     SqlAlchemyCatalogQueryGateway,
@@ -53,15 +50,21 @@ from goldy.infrastructure.adapters.persistence.sqlalchemy_order_command_gateway 
 from goldy.infrastructure.adapters.persistence.sqlalchemy_order_query_gateway import (
     SqlAlchemyOrderQueryGateway,
 )
-from goldy.infrastructure.adapters.persistence.sqlalchemy_pricing_gateway import (
-    SqlAlchemyPricingGateway,
+from goldy.infrastructure.adapters.persistence.sqlalchemy_pricing_reader import (
+    SqlAlchemyPricingReader,
 )
 from goldy.infrastructure.errors import RepoError
+from goldy.infrastructure.mappers.sqlalchemy_cart_row_view_mapper import (
+    SqlAlchemyCartRowViewMapper,
+)
 from goldy.infrastructure.mappers.sqlalchemy_catalog_row_view_mapper import (
     SqlAlchemyCatalogRowViewMapper,
 )
 from goldy.infrastructure.mappers.sqlalchemy_order_row_view_mapper import (
     SqlAlchemyOrderRowViewMapper,
+)
+from goldy.infrastructure.mappers.sqlalchemy_pricing_row_mapper import (
+    SqlAlchemyPricingRowMapper,
 )
 from tests.unit.factories.catalog_factories import make_scope
 from tests.unit.factories.domain_factories import make_events_collection, make_user_id
@@ -80,11 +83,11 @@ def _catalog_queries(session: AsyncSession) -> SqlAlchemyCatalogQueryGateway:
     return SqlAlchemyCatalogQueryGateway(session, SqlAlchemyCatalogRowViewMapper())
 
 
-def _pricing(session: AsyncSession) -> SqlAlchemyPricingGateway:
-    return SqlAlchemyPricingGateway(
+def _pricing(session: AsyncSession) -> SqlAlchemyPricingReader:
+    return SqlAlchemyPricingReader(
         session,
         make_price_type_id(),
-        SqlAlchemyCatalogRowViewMapper(),
+        SqlAlchemyPricingRowMapper(),
     )
 
 
@@ -92,8 +95,8 @@ def _orders(session: AsyncSession) -> SqlAlchemyOrderCommandGateway:
     return SqlAlchemyOrderCommandGateway(session, make_events_collection())
 
 
-def _projection(session: AsyncSession) -> projection.SqlAlchemyCatalogProjectionGateway:
-    return projection.SqlAlchemyCatalogProjectionGateway(session)
+def _projection(session: AsyncSession) -> SqlAlchemyCatalogProjectionDao:
+    return SqlAlchemyCatalogProjectionDao(session)
 
 
 def _order_queries(session: AsyncSession) -> SqlAlchemyOrderQueryGateway:
@@ -107,10 +110,12 @@ async def _add_an_order(session: AsyncSession) -> object:
 
 
 CALLS: Final[dict[str, Call]] = {
-    "order number generator": lambda session: PostgresOrderNumberGenerator(session)(),
-    "catalog: categories": lambda session: _catalog_queries(session).read_categories(
-        None,
-    ),
+    "catalog: root categories": lambda session: _catalog_queries(
+        session,
+    ).read_root_categories(),
+    "catalog: subcategories": lambda session: _catalog_queries(
+        session,
+    ).read_subcategories(CategoryId(value="1c-category-1")),
     "catalog: one category": lambda session: _catalog_queries(session).read_category(
         CategoryId(value="1c-category-1"),
     ),
@@ -145,14 +150,14 @@ CALLS: Final[dict[str, Call]] = {
     "pricing: price type of a customer": lambda session: _pricing(
         session,
     ).read_price_type_for(make_user_id()),
-    "pricing: priced products": lambda session: _pricing(session).read_priced_products(
+    "pricing: cart prices": lambda session: _pricing(session).read_cart_prices(
         (make_product_id(),),
         make_price_type_id(),
     ),
-    "cart: the cart screen": lambda session: SqlAlchemyCartQueryGateway(session).read_for(
-        make_user_id(),
-        make_price_type_id(),
-    ),
+    "cart: the cart screen": lambda session: SqlAlchemyCartQueryGateway(
+        session,
+        SqlAlchemyCartRowViewMapper(),
+    ).read_for(make_user_id(), make_price_type_id()),
     "order: add": _add_an_order,
     "order: by id": lambda session: _orders(session).by_id(make_order_id()),
     "order: the card": lambda session: _order_queries(session).read_by_id(

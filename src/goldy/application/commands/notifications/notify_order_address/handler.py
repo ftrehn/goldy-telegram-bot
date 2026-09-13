@@ -1,7 +1,6 @@
 import logging
 from typing import Final, override
 
-from goldy.application.commands.notifications import text_keys
 from goldy.application.commands.notifications.dispatcher import NotificationDispatcher
 from goldy.application.commands.notifications.notify_order_address.command import (
     NotifyDeliveryAddressChangedCommand,
@@ -10,10 +9,9 @@ from goldy.application.commands.notifications.outcome import NotificationOutcome
 from goldy.application.common.mediator.handlers import CommandHandler
 from goldy.application.common.ports.notifications import (
     InboxGateway,
-    NotificationText,
+    OrderDeliveryAddressChangedNotification,
 )
 from goldy.application.common.ports.users import UserQueryGateway
-from goldy.domain.orders.events import OrderDeliveryAddressChanged
 from goldy.domain.users.values.user_id import UserId
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
@@ -48,10 +46,7 @@ class NotifyDeliveryAddressChangedHandler(
         self,
         command: NotifyDeliveryAddressChangedCommand,
     ) -> NotificationOutcome:
-        claimed = await self._inbox_gateway.claim(
-            command.message_id,
-            OrderDeliveryAddressChanged.__name__,
-        )
+        claimed = await self._inbox_gateway.claim(command.message_id, command.event_type)
 
         if not claimed:
             logger.info(
@@ -74,13 +69,10 @@ class NotifyDeliveryAddressChangedHandler(
 
         outcome = await self._dispatcher.dispatch_to_all(
             [customer],
-            NotificationText(
-                key=text_keys.NOTIFICATION_ORDER_ADDRESS_CHANGED,
-                args={
-                    "number": command.order_number,
-                    "old_address": command.old_address,
-                    "new_address": command.new_address,
-                },
+            OrderDeliveryAddressChangedNotification(
+                number=command.order_number,
+                old_address=command.old_address,
+                new_address=command.new_address,
             ),
         )
 

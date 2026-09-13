@@ -47,7 +47,6 @@ from tests.unit.factories.shop_factories import (
     make_delivery_address,
     make_order_comment,
     make_order_id,
-    make_order_number,
     make_price_type_id,
     make_priced_product,
     make_product_id,
@@ -63,6 +62,8 @@ pytestmark = [
 ]
 
 OTHER_ORDER_ID: str = "bbbbbbbb-2222-2222-2222-222222222222"
+TWIN_ORDER_ID: str = "cccccccc-3333-3333-3333-333311111111"
+"""Unlike ``ORDER_ID`` everywhere but in the low bits the number is spelled from."""
 RECIPIENT_PHONE: str = "+79995550101"
 """Not the customer's own number, because a recipient need not be the buyer."""
 
@@ -75,13 +76,14 @@ async def test_a_placed_order_reads_back_whole(
     worker_container: AsyncContainer,
 ) -> None:
     seeded = await seed_user()
+    stored = _an_order(seeded)
 
-    await _store(worker_container, _an_order(seeded))
+    await _store(worker_container, stored)
 
     loaded = await _load(worker_container, make_order_id())
 
     assert loaded is not None
-    assert loaded.number == make_order_number()
+    assert loaded.number == stored.number
     assert loaded.customer_id == seeded.id
     assert loaded.status is OrderStatus.NEW
     assert loaded.price_type_id == make_price_type_id()
@@ -248,6 +250,7 @@ async def test_a_cancelled_order_keeps_who_cancelled_it_and_why(
         assert loaded is not None
         loaded.cancel(
             initiated_by=CancellationInitiator.MANAGER,
+            cancelled_by_user_id=seeded.id,
             reason=CancellationReason(value="Товара не оказалось на складе"),
         )
         await transaction.commit()
@@ -257,6 +260,7 @@ async def test_a_cancelled_order_keeps_who_cancelled_it_and_why(
     assert reloaded is not None
     assert reloaded.status is OrderStatus.CANCELLED
     assert reloaded.cancelled_by is CancellationInitiator.MANAGER
+    assert reloaded.cancelled_by_user_id == seeded.id
     assert reloaded.cancellation_reason == CancellationReason(
         value="Товара не оказалось на складе",
     )
@@ -266,16 +270,18 @@ async def test_a_second_order_on_one_number_is_refused_as_ours(
     seed_user: UserSeeder,
     worker_container: AsyncContainer,
 ) -> None:
-    """The number comes from a sequence, so a clash means a hand-written insert.
+    """Two ids that spell the same number on the same day meet the unique index.
 
-    It is refused all the same, and refused as an ``InfrastructureError`` — the
-    gateway flushes so that no ``IntegrityError`` from the driver escapes past
-    the adapter and surfaces later as a commit that silently did not happen.
+    The number is derived from the low bits of the id, so a clash takes two
+    ids that agree on those bits — which is what ``TWIN_ORDER_ID`` is. It is
+    refused as an ``InfrastructureError``: the gateway flushes so that no
+    ``IntegrityError`` from the driver escapes past the adapter and surfaces
+    later as a commit that silently did not happen.
     """
     seeded = await seed_user()
     await _store(worker_container, _an_order(seeded))
 
-    clash = _an_order(seeded, order_id=make_order_id(OTHER_ORDER_ID))
+    clash = _an_order(seeded, order_id=make_order_id(TWIN_ORDER_ID))
 
     async with worker_container(scope=Scope.REQUEST) as scope:
         gateway: OrderCommandGateway = await scope.get(OrderCommandGateway)
@@ -308,7 +314,6 @@ def _an_order(
 
     return Order.place(
         order_id=order_id if order_id is not None else make_order_id(),
-        order_number=make_order_number(),
         events_collection=make_events_collection(),
         placement=Placement(
             customer_id=customer.id,

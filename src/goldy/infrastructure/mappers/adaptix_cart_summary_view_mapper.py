@@ -1,22 +1,22 @@
 """The converter behind what a cart command answers with, built at import time.
 
-Every field goes through a ``link_function``, because adaptix links fields and
-not paths: two of the three are properties of the aggregate rather than fields
-of it, and the third does not come off the aggregate at all. ``ProductId`` needs
-one for the reason ``UserId`` does — a value the view carries as text is not
-text in the domain, and adaptix does not unwrap it on its own.
+A private, module-level ``ConversionRetort`` holds the recipe, and the converter
+is generated from it once — the retort caches the code it generates, so a
+retort built in a constructor would regenerate it on every command and hold
+the cache for nothing.
 
-``impl_converter`` rather than ``get_converter``: the mapper takes two
-arguments. The first parameter of a linking function is the source model, and
-the parameters after it are matched by name against the converter's own extra
-parameters, which is how ``changed_product_id`` reaches the field of the same
-name.
+Every field is a ``link`` with a coercer rather than a linking function of its
+own: the two counts are readings of ``Cart.lines`` and the third field is the
+converter's second argument, reached through ``from_param``. adaptix links
+fields, not properties, which is why ``line_count`` is spelled as the length of
+the lines here rather than as the aggregate's property of the same name — the
+two say the same thing, and the test beside this module pins that down.
 """
 
-from typing import final, override
+from typing import Final, final, override
 
 from adaptix import P
-from adaptix.conversion import impl_converter, link_function
+from adaptix.conversion import ConversionRetort, from_param, link
 
 from goldy.application.common.ports.mappers.cart_summary_view_mapper import (
     CartSummaryViewMapper,
@@ -25,36 +25,24 @@ from goldy.application.common.views.cart import CartSummaryView
 from goldy.domain.carts.entities.cart import Cart
 from goldy.domain.catalog.values.product_id import ProductId
 
-
-def _line_count_of(cart: Cart) -> int:
-    return cart.line_count
-
-
-def _total_quantity_of(cart: Cart) -> int:
-    return cart.total_quantity
-
-
-def _changed_product_id_of(
-    _cart: Cart,
-    changed_product_id: ProductId | None,
-) -> str | None:
-    """Unwraps the product the command touched, or reports that all of them were.
-
-    The cart is taken and ignored on purpose: adaptix hands the source model to
-    the first parameter of every linking function, and this one is answered
-    entirely from the converter's second argument. The aggregate could not
-    answer it anyway — it does not know which of its lines was just changed.
-    """
-    return changed_product_id.value if changed_product_id is not None else None
-
-
-@impl_converter(
+_retort: Final[ConversionRetort] = ConversionRetort(
     recipe=[
-        link_function(_line_count_of, P[CartSummaryView].line_count),
-        link_function(_total_quantity_of, P[CartSummaryView].total_quantity),
-        link_function(_changed_product_id_of, P[CartSummaryView].changed_product_id),
+        link(P[Cart].lines, P[CartSummaryView].line_count, coercer=len),
+        link(
+            P[Cart].lines,
+            P[CartSummaryView].total_quantity,
+            coercer=lambda lines: sum(line.quantity.value for line in lines),
+        ),
+        link(
+            from_param("changed_product_id"),
+            P[CartSummaryView].changed_product_id,
+            coercer=lambda product_id: None if product_id is None else product_id.value,
+        ),
     ],
 )
+
+
+@_retort.impl_converter
 def _convert_cart_summary(
     cart: Cart,
     changed_product_id: ProductId | None,
@@ -71,12 +59,7 @@ def _convert_cart_summary(
 
 @final
 class AdaptixCartSummaryViewMapper(CartSummaryViewMapper):
-    """Maps a just-changed cart to the counts its command hands back.
-
-    The converter is module-level for the reason the other adaptix mappers give:
-    the retort caches generated code, so building it per instance would
-    regenerate it on every command.
-    """
+    """Maps a just-changed cart to the counts its command hands back."""
 
     @override
     def to_view(

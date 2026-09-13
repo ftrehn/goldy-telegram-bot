@@ -14,36 +14,30 @@ class CartCommandGateway(Protocol):
     on how many — so a partially loaded cart could pass a check it should have
     failed.
 
-    Two lookups, and which one a use case calls is a decision about what
-    happens when there is no cart. "One cart per person" spans aggregates and
-    cannot be held in the domain: two simultaneous additions both find nothing
-    and both insert. A unique index holds it and :meth:`ensure_for` removes the
-    race without an error and without a retry — which matters, because after an
-    ``IntegrityError`` the session is rollback-only and a retry inside the
-    handler would hit ``PendingRollbackError``.
+    A thin gateway, on purpose: one read and one add, the shape
+    ``UserCommandGateway`` has. Whether a person who has no cart yet gets one
+    is not a question about storage, so it is not answered here —
+    ``CartProvider`` in the application layer takes that decision, and this
+    port only reports when a concurrent request took it first.
     """
 
     @abstractmethod
-    async def ensure_for(self, user_id: UserId) -> Cart:
-        """This person's cart, created on the spot if they have none.
+    async def add(self, cart: Cart) -> None:
+        """Inserts a new cart, flushing so a clash surfaces here.
 
-        Implemented as ``INSERT ... ON CONFLICT (user_id) DO NOTHING RETURNING
-        id`` followed by a read when the insert returned nothing, so two
-        concurrent first additions both end up on the same row.
+        "One cart per person" spans aggregates and is held by a unique index on
+        ``user_id``: two simultaneous first additions both find nothing and
+        both insert, and the second insert is the only place the race can be
+        seen. The clash is reported as an error the caller can act on, and
+        the session stays usable afterwards — the caller's next move is to
+        read the cart that won.
 
-        Called where an absent cart is not a failure: adding to the cart, and
-        placing an order — which then meets an empty cart and refuses with
-        ``EmptyCartError``, and that is the real backstop against a double tap
-        on "confirm".
+        Raises:
+            CartAlreadyExistsError: this person already has a cart.
         """
         raise NotImplementedError
 
     @abstractmethod
     async def by_user_id(self, user_id: UserId) -> Cart | None:
-        """This person's cart, or nothing.
-
-        Called where the cart has to exist already — removing a line, changing
-        a quantity, emptying it — so that ``None`` becomes
-        ``CartNotFoundError`` rather than a cart conjured up to be emptied.
-        """
+        """This person's cart, or nothing."""
         raise NotImplementedError

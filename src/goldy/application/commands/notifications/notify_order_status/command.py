@@ -16,9 +16,13 @@ class NotifyOrderStatusChangedCommand(Command[NotificationOutcome]):
 
     ``old_status`` is not among them. "Confirmed → shipped" is a sentence for a
     log, not for a customer, who wants to know where the parcel is now.
+
+    :attr:`event_type` is the name the message was published under, carried
+    by whoever received it so the inbox records what the claim was for.
     """
 
     message_id: UUID
+    event_type: str
     order_number: str
     customer_id: UUID
     new_status: str

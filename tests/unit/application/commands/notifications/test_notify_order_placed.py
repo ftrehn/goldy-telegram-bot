@@ -21,6 +21,8 @@ from goldy.application.commands.notifications.notify_order_placed.handler import
 )
 from goldy.application.common.views.money import MoneyView
 from goldy.application.common.views.order import OrderView
+from goldy.application.error import NotificationChannelUnavailableError
+from goldy.domain.orders.events import OrderPlaced
 from goldy.domain.orders.values.order_id import OrderId
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
 from goldy.domain.users.values.user_id import UserId
@@ -61,7 +63,11 @@ def placed_order(orders: StubOrderQueryGateway) -> OrderView:
 
 
 def a_placement() -> NotifyOrderPlacedCommand:
-    return NotifyOrderPlacedCommand(message_id=MESSAGE_ID, order_id=UUID(ORDER_ID))
+    return NotifyOrderPlacedCommand(
+        message_id=MESSAGE_ID,
+        event_type=OrderPlaced.__name__,
+        order_id=UUID(ORDER_ID),
+    )
 
 
 async def test_a_new_order_reaches_managers_and_administrators(
@@ -154,7 +160,11 @@ async def test_a_second_message_about_the_same_order_is_still_delivered(
 
     await notify_order_placed.handle(a_placement())
     second = await notify_order_placed.handle(
-        NotifyOrderPlacedCommand(message_id=OTHER_MESSAGE_ID, order_id=UUID(ORDER_ID)),
+        NotifyOrderPlacedCommand(
+            message_id=OTHER_MESSAGE_ID,
+            event_type=OrderPlaced.__name__,
+            order_id=UUID(ORDER_ID),
+        ),
     )
 
     assert second.delivered == 1
@@ -181,7 +191,7 @@ async def test_a_blocked_manager_is_not_written_to(
     assert {n.external_id for n in sender.sent} == {ADMIN_ACCOUNT}
 
 
-async def test_a_manager_who_asked_for_max_is_not_reached_on_telegram(
+async def test_a_manager_on_a_messenger_this_worker_cannot_reach_is_refused_loudly(
     seed_user: UserSeeder,
     notify_order_placed: NotifyOrderPlacedHandler,
     sender: RecordingNotificationSender,
@@ -189,7 +199,9 @@ async def test_a_manager_who_asked_for_max_is_not_reached_on_telegram(
     """``UserPreferences.notify_via`` is respected rather than consulted.
 
     The Telegram id is on file and would deliver perfectly well; sending to it
-    anyway would make the setting decorative.
+    anyway would make the setting decorative. And a worker with no sender for
+    the chosen messenger is misconfigured, which is said out loud rather than
+    counted as a skip.
     """
     seed_user(
         MANAGER_ID,
@@ -198,10 +210,9 @@ async def test_a_manager_who_asked_for_max_is_not_reached_on_telegram(
         notify_via=MessengerPlatform.MAX,
     )
 
-    outcome = await notify_order_placed.handle(a_placement())
+    with pytest.raises(NotificationChannelUnavailableError):
+        await notify_order_placed.handle(a_placement())
 
-    assert outcome.delivered == 0
-    assert outcome.skipped == 1
     assert sender.sent == []
 
 

@@ -18,6 +18,7 @@ from goldy.presentation.telegram.common.paging import reset_paging
 from goldy.presentation.telegram.common.widgets import I18N_CONTEXT_KEY
 from goldy.presentation.telegram.handlers.manage_orders.getters import (
     ORDER_ID_KEY,
+    QUEUE_SCROLL_ID,
     STATUS_FILTER_KEY,
     selected_order_id,
 )
@@ -48,7 +49,7 @@ async def on_filter_selected(
     the end.
     """
     manager.dialog_data[STATUS_FILTER_KEY] = item_id
-    reset_paging(manager)
+    await reset_paging(manager, scroll_id=QUEUE_SCROLL_ID)
     await manager.switch_to(ManageOrdersStates.QUEUE)
 
 
@@ -59,7 +60,7 @@ async def on_filter_cleared(
 ) -> None:
     """Puts every status back in the queue."""
     manager.dialog_data.pop(STATUS_FILTER_KEY, None)
-    reset_paging(manager)
+    await reset_paging(manager, scroll_id=QUEUE_SCROLL_ID)
     await manager.switch_to(ManageOrdersStates.QUEUE)
 
 
@@ -130,11 +131,3 @@ async def on_cancellation_reason_typed(
 
     await message.answer(i18n.get(text_keys.MANAGE_ORDERS_STATUS_CHANGED_TOAST))
     await manager.switch_to(ManageOrdersStates.CARD)
-
-
-async def on_close(
-    _callback: CallbackQuery,
-    _widget: Button,
-    manager: DialogManager,
-) -> None:
-    await manager.done()

@@ -52,8 +52,15 @@ def make_order_row(
     comment: str | None = None,
     cancelled_by: CancellationInitiator | None = None,
     cancellation_reason: str | None = None,
+    canceller_name: tuple[str, str | None] | None = None,
 ) -> RowMapping:
-    """One row of the order card query, joined to the buyer's status."""
+    """One row of the order card query, joined to the buyer's status.
+
+    ``canceller_name`` is the outer-joined name of whoever cancelled, as the
+    query labels it: absent for an order nobody cancelled and for a staff
+    account removed since.
+    """
+    first_name, last_name = canceller_name if canceller_name is not None else (None, None)
     return cast(
         "RowMapping",
         {
@@ -69,6 +76,9 @@ def make_order_row(
             "recipient_last_name": RECIPIENT_LAST_NAME,
             "recipient_phone": make_phone_number(),
             "cancelled_by": cancelled_by,
+            "cancelled_by_user_id": None if cancelled_by is None else make_user_id(),
+            "canceller_first_name": first_name,
+            "canceller_last_name": last_name,
             "cancellation_reason": (
                 None
                 if cancellation_reason is None
@@ -86,8 +96,6 @@ def make_order_line_row(
     quantity: int = 1,
     price: str = UNIT_PRICE,
     stock: str | None = None,
-    *,
-    with_sku: bool = True,
 ) -> RowMapping:
     """One row of the lines query, with today's stock joined onto the snapshot.
 
@@ -101,7 +109,7 @@ def make_order_line_row(
             "order_id": make_order_id(),
             "position": position,
             "product_id": make_product_id(index),
-            "sku": Sku(value=f"SKU-{index}") if with_sku else None,
+            "sku": Sku(value=f"SKU-{index}"),
             "name": ProductName(value=f"Товар {index}"),
             "unit_id": UNIT_SOURCE_ID,
             "unit_name": UNIT_NAME,

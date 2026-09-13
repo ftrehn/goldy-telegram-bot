@@ -2,13 +2,12 @@ from typing import Final, override
 
 from goldy.application.commands.orders.place_order.command import PlaceOrderCommand
 from goldy.application.common.mediator.handlers import CommandHandler
-from goldy.application.common.ports.carts import CartCommandGateway
 from goldy.application.common.ports.orders import OrderCommandGateway
 from goldy.application.common.services.cart_pricing_service import (
     CartPricing,
     CartPricingService,
 )
-from goldy.application.common.services.user_provider import UserProvider
+from goldy.application.common.services.cart_provider import CartProvider
 from goldy.application.common.views.order import OrderPlacedView
 from goldy.application.error import CartRepricedError
 from goldy.domain.carts.entities.cart import Cart
@@ -23,9 +22,16 @@ from goldy.domain.users.values.phone_number import PhoneNumber
 class PlaceOrderHandler(CommandHandler[PlaceOrderCommand, OrderPlacedView]):
     """Places the order and empties the cart, both or neither.
 
-    Five collaborators, which is the ceiling ``PLR0913`` allows and the reason
-    ``CartPricingService`` exists at all: resolving a price type and reading
-    prices would otherwise be two more.
+    Four collaborators, one under the ceiling ``PLR0913`` allows, and the
+    reason ``CartPricingService`` and ``CartProvider`` exist at all: resolving
+    a price type, reading prices and finding the cart of whoever is asking
+    would otherwise be three more.
+
+    The cart is taken through ``current_or_new`` rather than ``current``, and
+    the choice is deliberate. A second tap on "confirm" arrives after the
+    checkout emptied the cart, and what it must meet is ``EmptyCartError`` —
+    "the order is already placed" — not "you have no cart"; that is the one
+    defence against a double tap that works across platforms.
 
     Emptying the cart is not done here — ``CheckoutService`` does it, inside the
     same transaction as the insert. That is what makes a second confirmation
@@ -43,14 +49,12 @@ class PlaceOrderHandler(CommandHandler[PlaceOrderCommand, OrderPlacedView]):
 
     def __init__(
         self,
-        user_provider: UserProvider,
-        cart_command_gateway: CartCommandGateway,
+        cart_provider: CartProvider,
         cart_pricing_service: CartPricingService,
         checkout_service: CheckoutService,
         order_command_gateway: OrderCommandGateway,
     ) -> None:
-        self._user_provider: Final[UserProvider] = user_provider
-        self._cart_command_gateway: Final[CartCommandGateway] = cart_command_gateway
+        self._cart_provider: Final[CartProvider] = cart_provider
         self._cart_pricing_service: Final[CartPricingService] = cart_pricing_service
         self._checkout_service: Final[CheckoutService] = checkout_service
         self._order_command_gateway: Final[OrderCommandGateway] = order_command_gateway
@@ -73,14 +77,13 @@ class PlaceOrderHandler(CommandHandler[PlaceOrderCommand, OrderPlacedView]):
             UnpricedCartLineError: the catalog lost one of the products between
                 the screen and the command.
         """
-        customer = await self._user_provider.current()
-        cart = await self._cart_command_gateway.ensure_for(customer.id)
+        cart = await self._cart_provider.current_or_new()
         cart.ensure_not_empty()
 
         pricing = await self._cart_pricing_service.for_cart(cart)
         self._ensure_not_repriced(command, cart, pricing)
 
-        order = await self._checkout_service.checkout(
+        order = self._checkout_service.checkout(
             self._build_checkout(command, cart, pricing),
         )
         await self._order_command_gateway.add(order)

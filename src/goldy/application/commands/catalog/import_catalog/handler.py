@@ -1,5 +1,4 @@
 import logging
-from collections.abc import Sequence
 from decimal import Decimal
 from typing import Final, override
 
@@ -8,10 +7,7 @@ from goldy.application.commands.catalog.import_catalog.command import (
 )
 from goldy.application.commands.catalog.scope_description import describe_scope
 from goldy.application.common.mediator.handlers import CommandHandler
-from goldy.application.common.ports.catalog import (
-    CatalogProjectionGateway,
-    PriceRow,
-)
+from goldy.application.common.ports.catalog import CatalogProjectionDao
 from goldy.application.common.views.catalog import CatalogImportResponse
 from goldy.domain.common.values.currency import Currency
 
@@ -44,38 +40,41 @@ class ImportCatalogHandler(CommandHandler[ImportCatalogCommand, CatalogImportRes
     whole catalog.
     """
 
-    def __init__(self, catalog_projection_gateway: CatalogProjectionGateway) -> None:
-        self._catalog_projection_gateway: Final[CatalogProjectionGateway] = (
-            catalog_projection_gateway
-        )
+    def __init__(self, catalog_projection_dao: CatalogProjectionDao) -> None:
+        self._catalog_projection_dao: Final[CatalogProjectionDao] = catalog_projection_dao
 
     @override
     async def handle(self, command: ImportCatalogCommand) -> CatalogImportResponse:
         snapshot = command.snapshot
         batch_id = snapshot.batch_id
-        gateway = self._catalog_projection_gateway
+        dao = self._catalog_projection_dao
 
-        prices = _acceptable_prices(snapshot.prices)
+        prices = [
+            price
+            for price in snapshot.prices
+            if price.amount > Decimal(0)
+            and price.currency.strip().lower() in SUPPORTED_CURRENCIES
+        ]
         discarded = len(snapshot.prices) - len(prices)
         accepted = 0
 
         if snapshot.categories:
-            accepted += await gateway.upsert_categories(snapshot.categories, batch_id)
+            accepted += await dao.upsert_categories(snapshot.categories, batch_id)
 
         if snapshot.products:
-            accepted += await gateway.upsert_products(snapshot.products, batch_id)
+            accepted += await dao.upsert_products(snapshot.products, batch_id)
 
         if snapshot.price_types:
-            accepted += await gateway.upsert_price_types(snapshot.price_types, batch_id)
+            accepted += await dao.upsert_price_types(snapshot.price_types, batch_id)
 
         if prices:
-            accepted += await gateway.upsert_prices(prices, batch_id)
+            accepted += await dao.upsert_prices(prices, batch_id)
 
         if snapshot.stock:
-            accepted += await gateway.upsert_stock(snapshot.stock, batch_id)
+            accepted += await dao.upsert_stock(snapshot.stock, batch_id)
 
         if snapshot.price_type_bindings:
-            accepted += await gateway.upsert_price_type_bindings(
+            accepted += await dao.upsert_price_type_bindings(
                 snapshot.price_type_bindings,
                 batch_id,
             )
@@ -95,15 +94,3 @@ class ImportCatalogHandler(CommandHandler[ImportCatalogCommand, CatalogImportRes
             accepted=accepted,
             discarded=discarded,
         )
-
-
-def _acceptable_prices(prices: Sequence[PriceRow]) -> tuple[PriceRow, ...]:
-    """The price rows worth storing, in the order they arrived."""
-    return tuple(price for price in prices if _is_acceptable(price))
-
-
-def _is_acceptable(price: PriceRow) -> bool:
-    return (
-        price.amount > Decimal(0)
-        and price.currency.strip().lower() in SUPPORTED_CURRENCIES
-    )

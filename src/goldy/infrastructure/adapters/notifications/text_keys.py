@@ -1,12 +1,14 @@
-"""Every Fluent message key the notifier asks for, in one place.
+"""Every Fluent message key the notifier renders, in one place.
 
 The same registry the bot keeps for its screens, for the same reasons: a key is
 a contract with the ``.ftl`` files, and two literals spelled slightly
 differently is how one of them starts pointing at a message nobody wrote.
 
-It lives in the application layer rather than beside the translations because
-the handler is what chooses *what to say*; the adapter only knows how to say it
-in a given language. The files themselves ship with that adapter.
+It lives beside the renderer rather than in the application layer because the
+key is the renderer's business alone. A handler says *what* to say by building
+a typed ``Notification``; which Fluent message spells that in a given language,
+and with which placeholders, is knowledge of the files that ship with this
+adapter and of nothing above it.
 
 Reason and no reason are two keys rather than one message with a selector.
 Fluent can branch, but a branch means every rendering carries every argument —

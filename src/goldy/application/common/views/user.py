@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from goldy.domain.users.values.user_role import UserRole
+from goldy.domain.users.services.authorization.role_hierarchy import STAFF_ROLES
 from goldy.domain.users.values.user_status import UserStatus
 
 
@@ -47,7 +47,7 @@ class UserView:
     @property
     def is_staff(self) -> bool:
         """Whether this person may reach the admin side at all."""
-        return self.role in {UserRole.MANAGER.value, UserRole.ADMIN.value}
+        return self.role in {role.value for role in STAFF_ROLES}
 
 
 @dataclass(frozen=True, slots=True)

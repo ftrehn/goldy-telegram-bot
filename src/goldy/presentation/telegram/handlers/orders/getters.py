@@ -30,6 +30,9 @@ from goldy.presentation.telegram.common.order_cards import (
 )
 from goldy.presentation.telegram.common.paging import page_request, paging_data
 
+ORDERS_SCROLL_ID: Final[str] = "orders_scroll"
+
+
 ORDER_ID_KEY: Final[str] = "order_id"
 """Which order the card screens are about, as text.
 
@@ -82,13 +85,17 @@ async def orders_getter(
     is an ordinary question, and a history that quietly drops what it considers
     over cannot answer it.
     """
-    limit, offset = page_request(dialog_manager)
+    limit, offset = await page_request(dialog_manager, scroll_id=ORDERS_SCROLL_ID)
     view = await sender.send(ListMyOrdersQuery(limit=limit, offset=offset))
 
     return {
         "orders": [(_row(i18n, order), str(order.id)) for order in view.orders],
         "is_empty": not view.orders,
-        **paging_data(dialog_manager, total=view.total),
+        **await paging_data(
+            dialog_manager,
+            scroll_id=ORDERS_SCROLL_ID,
+            total=view.total,
+        ),
     }
 
 

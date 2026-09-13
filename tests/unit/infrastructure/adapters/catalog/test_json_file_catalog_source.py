@@ -1,12 +1,13 @@
 """What the seeder makes of the file it was pointed at.
 
-The adapter is a parser, which makes it the one piece of this wave that can be
-exercised end to end without a database. Two things are worth pinning. The
-first is the decisions: an absent collection is an empty one, a number goes
-through its text so no binary float reaches a price, and a unit ratio nobody
-sent is one. The second is the promise every adapter makes — that no library
-exception escapes it — because a seeder is run by a person reading the output,
-and ``JSONDecodeError`` in a traceback is not an answer to "what is wrong with
+The source reads the file and the adaptix mapper reads the contract off it,
+and the pair can be exercised end to end without a database. Two things are
+worth pinning. The first is the decisions: an absent collection is an empty
+one, a number goes through its text so no binary float reaches a price, a unit
+ratio nobody sent is one, and an article is never optional. The second is the
+promise every adapter makes — that no library exception escapes it — because a
+seeder is run by a person reading the output, and ``JSONDecodeError`` or an
+adaptix exception group in a traceback is not an answer to "what is wrong with
 my fixture".
 """
 
@@ -19,6 +20,9 @@ import pytest
 
 from goldy.application.common.ports.catalog import CatalogScopeKind
 from goldy.application.error import CatalogSourceError
+from goldy.infrastructure.adapters.catalog.adaptix_catalog_snapshot_mapper import (
+    AdaptixCatalogSnapshotMapper,
+)
 from goldy.infrastructure.adapters.catalog.json_file_catalog_source import (
     JsonFileCatalogSource,
 )
@@ -47,7 +51,11 @@ def _write(tmp_path: Path, document: object) -> Path:
 
 
 def _source(tmp_path: Path, document: object) -> JsonFileCatalogSource:
-    return JsonFileCatalogSource(_write(tmp_path, document))
+    return _source_at(_write(tmp_path, document))
+
+
+def _source_at(path: Path) -> JsonFileCatalogSource:
+    return JsonFileCatalogSource(path, AdaptixCatalogSnapshotMapper())
 
 
 async def test_a_snapshot_arrives_with_its_batch_and_its_scope(
@@ -56,7 +64,7 @@ async def test_a_snapshot_arrives_with_its_batch_and_its_scope(
     path = tmp_path / "snapshot.json"
     path.write_text(MINIMAL, encoding="utf-8")
 
-    snapshot = await JsonFileCatalogSource(path).read_snapshot()
+    snapshot = await _source_at(path).read_snapshot()
 
     assert snapshot.batch_id == "seed-0001"
     assert snapshot.scope.kind is CatalogScopeKind.PRODUCTS
@@ -75,7 +83,7 @@ async def test_a_collection_the_batch_does_not_carry_is_empty_rather_than_missin
     path = tmp_path / "snapshot.json"
     path.write_text(MINIMAL, encoding="utf-8")
 
-    snapshot = await JsonFileCatalogSource(path).read_snapshot()
+    snapshot = await _source_at(path).read_snapshot()
 
     assert snapshot.categories == ()
     assert snapshot.prices == ()
@@ -122,7 +130,7 @@ async def test_a_product_without_a_ratio_is_sold_one_for_one(tmp_path: Path) -> 
             "products": [
                 {
                     "id": "1c-product-1",
-                    "sku": None,
+                    "sku": "00000042",
                     "name": "Гайка оцинкованная",
                     "unit_name": "шт",
                 },
@@ -133,14 +141,32 @@ async def test_a_product_without_a_ratio_is_sold_one_for_one(tmp_path: Path) -> 
     snapshot = await source.read_snapshot()
 
     assert snapshot.products[0].unit_ratio == Decimal(1)
-    assert snapshot.products[0].sku is None
+
+
+async def test_a_product_without_an_article_is_a_broken_export(tmp_path: Path) -> None:
+    """The exchange sends the 1C code where the article is blank, so none is a defect."""
+    source = _source(
+        tmp_path,
+        {
+            "batch_id": "seed-0001",
+            "scope": {"kind": "products"},
+            "products": [
+                {"id": "1c-product-1", "sku": None, "name": "Гайка", "unit_name": "шт"},
+            ],
+        },
+    )
+
+    with pytest.raises(CatalogSourceReadError) as failure:
+        await source.read_snapshot()
+
+    assert "products[0].sku" in str(failure.value)
 
 
 async def test_a_missing_file_is_reported_rather_than_raised_as_an_oserror(
     tmp_path: Path,
 ) -> None:
     """The adapter's promise: no library exception leaves it, ever."""
-    source = JsonFileCatalogSource(tmp_path / "nothing-here.json")
+    source = _source_at(tmp_path / "nothing-here.json")
 
     with pytest.raises(CatalogSourceReadError) as failure:
         await source.read_snapshot()
@@ -154,7 +180,7 @@ async def test_a_file_that_is_not_json_names_itself_as_such(tmp_path: Path) -> N
     path.write_text("{ this is not json", encoding="utf-8")
 
     with pytest.raises(CatalogSourceReadError) as failure:
-        await JsonFileCatalogSource(path).read_snapshot()
+        await _source_at(path).read_snapshot()
 
     assert "not valid JSON" in str(failure.value)
 
@@ -165,14 +191,14 @@ async def test_a_file_that_is_not_utf_eight_is_reported_as_such(tmp_path: Path) 
     path.write_bytes('{"batch_id": "Болт"}'.encode("cp1251"))
 
     with pytest.raises(CatalogSourceReadError) as failure:
-        await JsonFileCatalogSource(path).read_snapshot()
+        await _source_at(path).read_snapshot()
 
     assert "not valid UTF-8" in str(failure.value)
     assert isinstance(failure.value.__cause__, UnicodeDecodeError)
 
 
 async def test_a_wrong_field_is_named_by_the_path_it_sits_at(tmp_path: Path) -> None:
-    """Naming the field is the point of hand-writing the whole parser.
+    """Naming the field is what the mapper flattens adaptix's exception tree for.
 
     A seeder is run by a person watching the output, and naming the field is
     the difference between fixing a fixture and guessing at it.
@@ -183,8 +209,8 @@ async def test_a_wrong_field_is_named_by_the_path_it_sits_at(tmp_path: Path) -> 
             "batch_id": "seed-0001",
             "scope": {"kind": "products"},
             "products": [
-                {"id": "1c-product-1", "sku": None, "name": "Болт", "unit_name": "шт"},
-                {"id": "1c-product-2", "sku": None, "name": 42, "unit_name": "шт"},
+                {"id": "1c-product-1", "sku": "A-1", "name": "Болт", "unit_name": "шт"},
+                {"id": "1c-product-2", "sku": "A-2", "name": 42, "unit_name": "шт"},
             ],
         },
     )
@@ -193,7 +219,7 @@ async def test_a_wrong_field_is_named_by_the_path_it_sits_at(tmp_path: Path) -> 
         await source.read_snapshot()
 
     assert "products[1].name" in str(failure.value)
-    assert "int" in str(failure.value)
+    assert "string" in str(failure.value)
 
 
 async def test_an_empty_string_is_not_a_name(tmp_path: Path) -> None:
@@ -204,7 +230,7 @@ async def test_an_empty_string_is_not_a_name(tmp_path: Path) -> None:
             "batch_id": "seed-0001",
             "scope": {"kind": "products"},
             "products": [
-                {"id": "1c-product-1", "sku": None, "name": "   ", "unit_name": "шт"},
+                {"id": "1c-product-1", "sku": "A-1", "name": "   ", "unit_name": "шт"},
             ],
         },
     )
@@ -246,7 +272,7 @@ async def test_a_moment_that_is_not_a_moment_is_refused(tmp_path: Path) -> None:
             "products": [
                 {
                     "id": "1c-product-1",
-                    "sku": None,
+                    "sku": "A-1",
                     "name": "Болт",
                     "unit_name": "шт",
                     "source_changed_at": "yesterday",

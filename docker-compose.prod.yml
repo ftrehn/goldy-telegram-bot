@@ -14,7 +14,14 @@
 # goldy-receiver: the compose name "catalog-receiver" is generic enough to
 # collide with another project on the same network. Only the receiver joins
 # that network; the bot, the worker and the scheduler have nothing to offer a
-# proxy and stay on the project's private one.
+# proxy.
+#
+# What those three do need is the way out to Telegram. On this server it is
+# the Xray client in /opt/tunnel, container tg-proxy, which speaks SOCKS5 on
+# the external "tgproxy" network and carries everything to the Dutch server
+# inside a VLESS+Reality stream — the bot's TELEGRAM_PROXY_URL points at it.
+# The scheduler joins for symmetry only: it validates the same variable
+# because it builds the worker's container, and never dials Telegram.
 #
 # Log rotation is set per service. The json-file driver keeps everything by
 # default, and a bot that logs every update fills a disk in months, quietly.
@@ -58,6 +65,9 @@ services:
     logging: *logging-quiet
 
   bot:
+    networks:
+      - default
+      - tgproxy
     logging: *logging-default
     deploy:
       resources:
@@ -65,6 +75,9 @@ services:
           memory: 512m
 
   worker:
+    networks:
+      - default
+      - tgproxy
     logging: *logging-verbose
     deploy:
       resources:
@@ -72,6 +85,9 @@ services:
           memory: 512m
 
   scheduler:
+    networks:
+      - default
+      - tgproxy
     logging: *logging-quiet
     deploy:
       resources:
@@ -112,9 +128,13 @@ services:
         limits:
           memory: 768m
 
-# Created once on the server, outside any compose project:
+# Both created once on the server, outside any compose project:
 #   docker network create edge
-# The shared Caddy and every service it proxies meet here.
+#   docker network create tgproxy
+# The shared Caddy and every service it proxies meet on edge; the Telegram
+# tunnel client and the processes that talk to Telegram meet on tgproxy.
 networks:
   edge:
+    external: true
+  tgproxy:
     external: true

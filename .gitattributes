@@ -1,0 +1,7 @@
+# The files under integrations/1c/ext/ are what the 1C Designer dumps with
+# "save configuration to files": UTF-8 with BOM, CRLF, tabs. Those bytes are the
+# contract with the Designer — "load from files" diffs them against what it
+# would dump itself, and a checkout with LF endings shows every line changed.
+# Pin the line endings here so they no longer depend on each clone's
+# core.autocrlf: the repository stores LF, and every platform checks out CRLF.
+integrations/1c/ext/** text eol=crlf

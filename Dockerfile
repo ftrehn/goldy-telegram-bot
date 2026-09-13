@@ -1,11 +1,13 @@
-# One image, four processes. The bot, the worker, the scheduler and the catalog
-# seeder share a dependency set and differ only in the command, so building four
-# images would mean four things to keep in step and four chances to deploy a
-# mismatched pair.
+# One image, five processes. The bot, the worker, the scheduler, the catalog
+# receiver and the catalog seeder share a dependency set and differ only in the
+# command, so building five images would mean five things to keep in step and
+# five chances to deploy a mismatched pair.
 #
 #   docker build -t goldy:latest .
 #   docker run --env-file .env goldy:latest                      # bot
 #   docker run --env-file .env goldy:latest taskiq worker ...    # worker
+#   docker run --env-file .env -p 8090:8090 goldy:latest \
+#       python -m goldy.catalog_receiver_app                     # receiver
 #
 # The default command is the bot; docker-compose.yaml overrides it per service.
 

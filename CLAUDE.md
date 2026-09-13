@@ -35,7 +35,8 @@ This file adds only what is specific to working here interactively.
 ## Running things
 
 Unit tests need nothing. Integration tests need Docker. Running the bot needs a
-token, Postgres, Redis and RabbitMQ.
+token, Postgres, Redis and RabbitMQ. The catalog receiver needs Postgres and
+`GOLDY_CATALOG_RECEIVER_TOKEN` — not a bot token, Redis or RabbitMQ.
 
 ```sh
 uv run --active pytest tests/unit -q     # fast, no Docker
@@ -43,12 +44,14 @@ uv run --active pytest tests/integration -q
 just pre-commit-all                      # everything CI runs
 ```
 
-Three processes, three entry points:
+Four processes, four entry points (`just bot`, `just worker`, `just scheduler`
+and `just receiver` run them with `.env` loaded):
 
 ```sh
 python -m goldy.telegram_bot
 taskiq worker goldy.worker_app:create_worker_taskiq_app
 taskiq scheduler goldy.scheduler_app:create_scheduler_taskiq_app
+python -m goldy.catalog_receiver_app
 ```
 
 Scratch scripts go in the session scratchpad directory, never in the repo.
@@ -59,11 +62,15 @@ Before saying a task is done:
 
 1. `just lint` — clean
 2. `just mypy` — clean
-3. `just import-linter` — 4 contracts kept, if you moved a module
+3. `just import-linter` — 5 contracts kept, if you moved a module
 4. `just pre-commit-all` — exit 0
 5. `uv run --active pytest tests/unit -q` — green, and say how many ran
 6. State plainly what you did **not** verify
 
-Nothing in `presentation/` has automated coverage yet. If you changed a handler,
-a dialog or a middleware, say so — that work is unverified by definition until
-integration tests exist.
+Handlers, dialogs and middlewares in `presentation/` are covered by integration
+tests through a mocked bot (`tests/integration/telegram/`,
+`tests/integration/scenarios/`) and partly by unit tests
+(`tests/unit/presentation/telegram/`). If you changed a handler, a dialog or a
+middleware, run the integration suite (needs Docker) and say whether you did.
+What no test covers is a live Telegram client — for that use
+`docs/manual-check.md`.

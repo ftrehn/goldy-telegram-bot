@@ -19,8 +19,11 @@ ruff-format *params:
 ruff-check *params:
   uv run --active --frozen ruff check --exit-non-zero-on-fix {{params}}
 
+# integrations/1c/scripts/out holds what the 1C scripts produce, including JSON
+# dumps of the real catalog, and product names spelled by the shop are not
+# typos for this project to fix.
 _codespell:
-  uv run --active --frozen codespell -L Dependant,dependant,selectin,aadd
+  uv run --active --frozen codespell -L Dependant,dependant,selectin,aadd --skip "./integrations/1c/scripts/out"
 
 [doc("Check typos")]
 [group("linter")]
@@ -30,6 +33,9 @@ typos: _codespell
 [doc("Linter run")]
 [group("linter")]
 linter: ruff-format ruff-check _codespell
+
+# AGENTS.md and CLAUDE.md say `just lint`; keep both spellings working.
+alias lint := linter
 
 # Static analysis
 [doc("Mypy check")]
@@ -105,6 +111,11 @@ worker env=".env":
 scheduler env=".env":
   uv run --active --frozen dotenv -f {{env}} run -- taskiq scheduler goldy.scheduler_app:create_scheduler_taskiq_app
 
+[doc("Run the catalog receiver 1C posts batches to (GOLDY_CATALOG_RECEIVER_* in the env file)")]
+[group("run")]
+receiver env=".env":
+  uv run --active --frozen dotenv -f {{env}} run -- python -m goldy.catalog_receiver_app
+
 [doc("Seed the catalog from a JSON snapshot (usage: just seed docs/design/catalog-snapshot.example.json)")]
 [group("run")]
 seed file env=".env":
@@ -118,7 +129,7 @@ docker-build:
 
 # Must be `.env` at the root: `env_file:` only reaches the containers, while
 # ${VAR:?} interpolation reads the project env file compose finds by that name.
-[doc("Start the local environment (postgres, nats, redis, qdrant, app)")]
+[doc("Start the local environment (postgres, redis, rabbitmq, app)")]
 [group("docker")]
 up *params:
   docker compose up -d {{params}}
@@ -126,17 +137,17 @@ up *params:
 [doc("Start only the backing services, for running the app on the host")]
 [group("docker")]
 up-deps:
-  docker compose up -d postgres nats redis qdrant
+  docker compose up -d postgres redis rabbitmq
 
 [doc("Start the dev backing services (throwaway defaults, no .env needed)")]
 [group("docker")]
 up-dev:
-  docker compose -f docker-compose.dev.yaml up -d
+  docker compose -f docker-compose.dev.yml up -d
 
 [doc("Stop and remove the dev backing services and their volumes")]
 [group("docker")]
 down-dev:
-  docker compose -f docker-compose.dev.yaml down -v
+  docker compose -f docker-compose.dev.yml down -v
 
 [doc("Stop the local environment")]
 [group("docker")]

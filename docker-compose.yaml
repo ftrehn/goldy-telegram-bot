@@ -1,15 +1,20 @@
-# Deployment: the four services this bot is, plus the three it depends on.
+# Deployment: the five services this bot is, plus the three it depends on.
 #
 # Everything is configured through .env — the same file .env.example documents.
 # Nothing here carries a default password: a compose file that boots with
 # guest/guest on a server is how a RabbitMQ ends up mining somebody's coins.
 #
-#   cp .env.example .env    # fill the token, the passwords and the price type
+#   cp .env.example .env    # fill the tokens, the passwords and the price type
 #   docker compose up -d
 #
-# Migrations run as their own one-shot service and the three long-running
+# Migrations run as their own one-shot service and the four long-running
 # processes wait for it to finish. Running "alembic upgrade head" from the bot's
-# entrypoint would mean three processes racing the same lock on every restart.
+# entrypoint would mean four processes racing the same lock on every restart.
+#
+# The catalog receiver is the only service that publishes a port: 1C posts the
+# catalog into it, and nothing else here takes an incoming connection. Put a
+# reverse proxy with TLS in front of it on a server; the bearer token is the
+# whole of its own protection.
 
 name: goldy
 
@@ -69,6 +74,30 @@ services:
         condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
+
+  # Inside the container the receiver always listens on 0.0.0.0:8090; the host
+  # side of the port mapping is what GOLDY_CATALOG_RECEIVER_PORT in .env moves.
+  # The same variable reaches the process through env_file, and the explicit
+  # environment below wins over it, so the two uses never disagree. The shared
+  # host entries are repeated because a YAML merge key replaces a nested
+  # mapping wholesale rather than merging into it.
+  catalog-receiver:
+    <<: *goldy
+    command: ["python", "-m", "goldy.catalog_receiver_app"]
+    ports:
+      - "${GOLDY_CATALOG_RECEIVER_PORT:-8090}:8090"
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      POSTGRES_PORT: "5432"
+      REDIS_PORT: "6379"
+      RABBITMQ_PORT: "5672"
+      GOLDY_CATALOG_RECEIVER_HOST: 0.0.0.0
+      GOLDY_CATALOG_RECEIVER_PORT: "8090"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
 
   postgres:
     image: postgres:17-alpine

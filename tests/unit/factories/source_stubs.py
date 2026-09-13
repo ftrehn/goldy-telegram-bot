@@ -9,6 +9,9 @@ from goldy.setup.bootstrap.sources.alchemy_env_source_factory import (
 from goldy.setup.bootstrap.sources.catalog_env_source_factory import (
     CatalogEnvSourceFactory,
 )
+from goldy.setup.bootstrap.sources.catalog_receiver_env_source_factory import (
+    CatalogReceiverEnvSourceFactory,
+)
 from goldy.setup.bootstrap.sources.postgres_env_source_factory import (
     PostgresEnvSourceFactory,
 )
@@ -27,6 +30,7 @@ from goldy.setup.bootstrap.sources.telegram_env_source_factory import (
 from tests.unit.factories.env_data_factories import (
     admin_env,
     catalog_env,
+    catalog_receiver_env,
     postgres_env,
     rabbitmq_env,
     redis_env,
@@ -95,4 +99,17 @@ def catalog_source_stub(**overrides: str) -> StubSourceFactory:
     return StubSourceFactory.mirroring(
         CatalogEnvSourceFactory(),
         catalog_env(**overrides),
+    )
+
+
+def catalog_receiver_source_stub(**overrides: str) -> StubSourceFactory:
+    """In-memory stub serving valid ``GOLDY_CATALOG_RECEIVER_*`` values.
+
+    Mirrors the production factory, so a typo in a variable name fails here
+    rather than in a deployment where the value is set and the process cannot
+    see it.
+    """
+    return StubSourceFactory.mirroring(
+        CatalogReceiverEnvSourceFactory(),
+        catalog_receiver_env(**overrides),
     )

@@ -20,3 +20,7 @@ QOS_MIN: Final[int] = 1
 
 TEMPERATURE_MIN: Final[float] = 0.0
 TEMPERATURE_MAX: Final[float] = 2.0
+
+RECEIVER_TOKEN_MIN_LENGTH: Final[int] = 32
+"""Short enough to type into a 1C constant, long enough that guessing is not a plan."""
+RECEIVER_MAX_BODY_MIB_MIN: Final[int] = 1

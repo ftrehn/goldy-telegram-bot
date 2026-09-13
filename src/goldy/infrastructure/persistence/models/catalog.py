@@ -227,11 +227,11 @@ catalog_stock_table: Final[Table] = Table(
 )
 """How much of one product is free to sell at one warehouse.
 
-Keyed by ``(product_id, warehouse_id)`` from the first day although 1C gives no
-warehouse breakdown yet — until it does, the consumer writes a fixed ``'*'``.
-The storefront query sums with a group-by from the first day for the same
-reason, so real warehouses appearing changes neither the SQL nor the gateway
-signature.
+Keyed by ``(product_id, warehouse_id)`` from the first day although a run
+carries one warehouse: 1C sends the GUID of the one warehouse the extension is
+configured with, and only the seeder's example file writes ``'*'``. The
+storefront query sums with a group-by over ``product_id`` for the same reason,
+so more warehouses appearing changes neither the SQL nor the gateway signature.
 
 ``quantity`` is fractional because stock is only ever displayed, never
 multiplied: metres and kilograms print fine and reach no arithmetic. It is the

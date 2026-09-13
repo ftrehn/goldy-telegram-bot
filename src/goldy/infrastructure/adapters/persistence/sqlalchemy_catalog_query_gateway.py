@@ -53,9 +53,11 @@ class SqlAlchemyCatalogQueryGateway(CatalogQueryGateway):
     warehouses in the same statement, so a listing costs one round trip for the
     page and one for its total regardless of how many products are on it.
 
-    **Stock is summed from the first day**, although 1C gives no warehouse
-    breakdown yet and the consumer writes a fixed ``'*'``. That is the whole
-    point: when real warehouses arrive, neither this SQL nor the port changes.
+    **Stock is summed from the first day**, although a run carries one
+    warehouse: 1C sends the GUID of the one warehouse the extension is
+    configured with, and only the seeder's example file writes ``'*'``. That
+    is the whole point: more warehouses appearing changes neither this SQL
+    nor the port.
 
     The join against the prices is an outer one, and a product with no row
     under this price type comes back unpriced instead of missing. A listing

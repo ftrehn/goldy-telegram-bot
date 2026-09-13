@@ -22,6 +22,7 @@ allowed_importers =
     goldy.presentation
     goldy.setup
     goldy.infrastructure.task_manager
+    goldy.infrastructure.catalog_receiver
 
 
 [importlinter:contract:protected_application_ports]
@@ -35,6 +36,7 @@ allowed_importers =
     goldy.infrastructure.adapters
     goldy.infrastructure.mappers
     goldy.infrastructure.task_manager
+    goldy.infrastructure.catalog_receiver
     goldy.setup
 
 

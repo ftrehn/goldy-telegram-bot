@@ -29,7 +29,7 @@ class ImportCatalogHandler(CommandHandler[ImportCatalogCommand, CatalogImportRes
     Every collection the snapshot carries is written, regardless of its scope.
     The scope says what a later sweep may remove, not what a batch is allowed
     to contain — the file the seeder reads carries the whole catalog at once,
-    while a consumer message carries one kind, and both are the same call here.
+    while a batch 1C posts carries one kind, and both are the same call here.
 
     Two kinds of price row are refused before a customer can see them, and both
     are counted rather than logged and forgotten. A price of zero reads as

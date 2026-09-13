@@ -11,7 +11,6 @@ from sqlalchemy import (
     delete,
     func,
     literal_column,
-    or_,
     select,
     update,
 )
@@ -61,22 +60,23 @@ SUPPORTED_CURRENCIES: Final[frozenset[str]] = frozenset(
 class SqlAlchemyCatalogProjectionDao(CatalogProjectionDao):
     """The only writer of the catalog projection.
 
-    A DAO by name and by shape: batches in, conditional upserts and sweeps
-    out, a count of rows touched for the import log. No aggregate is loaded
-    or built here, which is what separates it from the gateways beside it.
+    A DAO by name and by shape: batches in, upserts and sweeps out, a count
+    of rows touched for the import log. No aggregate is loaded or built here,
+    which is what separates it from the gateways beside it.
 
-    Every upsert is conditional on ``source_changed_at`` rather than merely
-    keyed by identifier, and that condition is what makes a repeated delivery
-    harmless. RabbitMQ reorders messages and repeats them after a restart,
-    while ``synced_at`` is stamped by us and therefore cannot tell a fresh
-    message from an old one replayed: without the condition a replayed old
-    price would overwrite a new one and mark itself fresh, after which the
-    sweep would leave it alone forever.
+    Every upsert is unconditional: a row that arrives overwrites the row
+    stored, whatever either one's ``source_changed_at`` says. The exchange
+    with 1C is synchronous and ordered (ADR-0004), and its one sender posts
+    the current state of 1C on every run rather than a message from the
+    past, so there is no older delivery to defend the projection against —
+    while a price that 1C itself rolled back to an earlier date is a real
+    case, and a condition on the date would refuse exactly that row.
+    ``source_changed_at`` is still stored, because 1C sends it and it says
+    when a price was set; it is informative, not a guard.
 
-    A row that carries no ``source_changed_at``, on either side, is taken as
-    the newer one. The column is filled by the exchange, today by a fixture,
-    and refusing rows for lacking it would mean refusing the whole catalog
-    until 1C starts sending it.
+    Only prices carry the column at all. Categories, products, price types,
+    stock and bindings arrive with ``null``, because nothing in 1C dates
+    them, and the projection stores the ``null`` as it came.
 
     Two things are decided here rather than by a handler, because both are
     properties of the projection rather than of a use case. A category's
@@ -237,6 +237,14 @@ class SqlAlchemyCatalogProjectionDao(CatalogProjectionDao):
         The qualifier on prices and stock is what keeps a single price list
         from wiping every other one, and it is applied only when the scope
         carries it — a full export of every price list carries none.
+
+        A price list that vanished takes its prices and its bindings with it.
+        Their own sweeps cannot reach them: the price sweep is scoped to the
+        price list a batch was about, and a list the exchange stopped sending
+        is never the subject of a batch again — the first live run against 1C
+        left the seed catalog's prices behind exactly this way. Nobody is
+        shown them, since a binding to a missing list resolves to nothing, but
+        rows that nothing can ever remove are not what a projection is for.
         """
         match scope.kind:
             case CatalogScopeKind.CATEGORIES:
@@ -244,7 +252,9 @@ class SqlAlchemyCatalogProjectionDao(CatalogProjectionDao):
             case CatalogScopeKind.PRODUCTS:
                 return await self._deactivate(catalog_products_table, batch_id)
             case CatalogScopeKind.PRICE_TYPES:
-                return await self._sweep(catalog_price_types_table, batch_id, ())
+                swept = await self._sweep(catalog_price_types_table, batch_id, ())
+                await self._drop_rows_of_vanished_price_types()
+                return swept
             case CatalogScopeKind.PRICES:
                 return await self._sweep(
                     catalog_prices_table,
@@ -289,7 +299,17 @@ class SqlAlchemyCatalogProjectionDao(CatalogProjectionDao):
         values: Sequence[Mapping[str, object]],
         what: str,
     ) -> int:
-        """Writes one batch of rows, never downgrading a row to an older one.
+        """Writes one batch of rows, overwriting whatever the projection held.
+
+        Unconditional on purpose, ``source_changed_at`` included. The upsert
+        used to refuse a row dated earlier than the one stored, against a
+        RabbitMQ replay; with 1C posting synchronously there is no replay,
+        and the condition did harm instead. A price set by a document that
+        is then unposted in 1C comes back from the register slice with the
+        earlier period of the price before it — exactly the row the
+        condition refused. The stored row then kept its old ``batch_id``,
+        the finalisation swept it as absent, and the product stood without
+        a price until the next run inserted it afresh.
 
         Generated columns are left out of the update on purpose: Postgres
         computes them and refuses to be told what they are.
@@ -304,15 +324,7 @@ class SqlAlchemyCatalogProjectionDao(CatalogProjectionDao):
             for column in table.columns
             if column.name not in keys and column.computed is None
         }
-        stmt = stmt.on_conflict_do_update(
-            index_elements=keys,
-            set_=updates,
-            where=or_(
-                stmt.excluded["source_changed_at"].is_(None),
-                table.c.source_changed_at.is_(None),
-                stmt.excluded["source_changed_at"] >= table.c.source_changed_at,
-            ),
-        )
+        stmt = stmt.on_conflict_do_update(index_elements=keys, set_=updates)
 
         return await self._count_written(stmt, f"upsert {what}")
 
@@ -341,6 +353,29 @@ class SqlAlchemyCatalogProjectionDao(CatalogProjectionDao):
 
         return await self._count_written(stmt, f"sweep rows of '{table.name}'")
 
+    async def _drop_rows_of_vanished_price_types(self) -> None:
+        """Deletes prices and bindings whose price list is no longer projected.
+
+        Counted into the log rather than into the sweep's return value: the
+        number a finalisation reports is the rows of its own scope, and a
+        price list's disappearance is the reason these rows go, not a second
+        thing the sweep did to that table.
+        """
+        known = select(catalog_price_types_table.c.id)
+
+        for table in (catalog_prices_table, catalog_price_type_bindings_table):
+            stmt = delete(table).where(table.c.price_type_id.not_in(known))
+            dropped = await self._count_written(
+                stmt,
+                f"drop rows of '{table.name}' left by a vanished price type",
+            )
+            if dropped:
+                logger.info(
+                    "finalize: dropped %d rows of '%s' whose price type is gone",
+                    dropped,
+                    table.name,
+                )
+
     async def _count_written(self, statement: UpdateBase, what: str) -> int:
         """Runs a write and brings back how many rows it actually touched.
 
@@ -348,10 +383,12 @@ class SqlAlchemyCatalogProjectionDao(CatalogProjectionDao):
         fetching the rows back, because a sweep of a large price list is tens
         of thousands of rows and nobody wants them — only how many there were.
 
-        Counting is not decoration either. An upsert that refuses to downgrade
-        a row writes fewer rows than it was given, and the difference between
-        "took your batch" and "ignored half of it as stale" is the line an
-        import log exists to show.
+        For an upsert the count equals the rows it was given, now that every
+        conflicting row is overwritten; it is kept as the confirmation 1C
+        reads back as ``accepted``. For a sweep it is the number that matters:
+        how many rows a run made stale is what the import log exists to show,
+        and a sweep that touched everything is the first sign of a run that
+        sent nothing.
         """
         counted = select(func.count()).select_from(
             statement.returning(literal_column("1")).cte("written"),
@@ -378,10 +415,10 @@ def _placements(categories: Sequence[CategoryRow]) -> dict[str, _Placement]:
 
     Computed here rather than sent by the exchange because it is derived from
     the batch as a whole, and that is only possible because the contract
-    requires the category snapshot to be complete and to arrive in one message.
+    requires the category snapshot to be complete and to arrive in one batch.
     A recursive query over the table would do the same without the column, but
-    it would need every parent to have landed already, and RabbitMQ promises no
-    such order.
+    it would need every parent to have landed already, and the contract
+    promises nothing about the order of rows inside a batch.
 
     A parent that is not in the batch ends the walk, and so does a cycle. Both
     are broken snapshots, and neither is worth failing a whole import over: the

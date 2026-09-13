@@ -1,4 +1,4 @@
-"""Object mothers for the contexts the four containers are built from.
+"""Object mothers for the contexts every container is built from.
 
 Everything a container needs that is *not* wired by a provider comes in as
 context, and the entry points assemble that themselves. These mothers assemble
@@ -19,6 +19,7 @@ from taskiq.schedule_sources import LabelScheduleSource
 
 from goldy.setup.bootstrap.setups.configs_setup import (
     SharedConfigs,
+    make_catalog_receiver_container_context,
     make_telegram_container_context,
     make_worker_container_context,
 )
@@ -29,6 +30,7 @@ from goldy.setup.configs.notification_config import NotificationConfig
 from goldy.setup.configs.taskiq_config import TaskIQConfig
 from goldy.setup.configs.telegram_config import TelegramConfig
 from tests.unit.factories.config_factories import (
+    create_catalog_receiver_config,
     create_postgres_config,
     create_rabbitmq_config,
     create_redis_config,
@@ -98,3 +100,17 @@ def create_catalog_seed_context() -> dict[type, object]:
     request scope.
     """
     return create_shared_configs().as_context()
+
+
+def create_catalog_receiver_context() -> dict[type, object]:
+    """The context ``goldy.catalog_receiver_app`` hands its container.
+
+    The configs plus the receiver's own. Nothing in the graph resolves the
+    receiver config today — the application takes the token and the body
+    ceiling as plain arguments — but the entry point puts it into the context
+    all the same, so the shape built here is the shape the process builds.
+    """
+    return make_catalog_receiver_container_context(
+        create_shared_configs(),
+        create_catalog_receiver_config(),
+    )

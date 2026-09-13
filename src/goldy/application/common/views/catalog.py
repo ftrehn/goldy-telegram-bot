@@ -166,7 +166,7 @@ class ProductSearchView:
 
 @dataclass(frozen=True, slots=True)
 class CatalogImportResponse:
-    """Outcome of one import batch, for the seeder and the consumer log.
+    """Outcome of one import batch, for the seeder and the HTTP receiver log.
 
     ``discarded`` counts rows the import refused before the customer could see
     them — a price of zero, which reads as "free", and prices under a price

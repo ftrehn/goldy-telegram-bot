@@ -25,11 +25,14 @@ class CatalogScopeKind(StrEnum):
 class CatalogScope:
     """What a batch covers, and therefore what finalising it may sweep.
 
-    ``price_type_id`` and ``warehouse_id`` narrow the sweep further, and they
-    are not optional out of politeness: deleting every price row a batch did
-    not mention, when the batch carried one price list, would delete all the
-    others. They are set for the ``PRICES`` and ``STOCK`` kinds respectively
-    and left unset everywhere else.
+    ``price_type_id`` and ``warehouse_id`` narrow the sweep when they are set.
+    A price batch always carries ``price_type_id``, and not out of politeness:
+    sweeping every price row a single price list did not mention would delete
+    all the others. Stock is different on purpose. Stock rows arrive with the
+    ``warehouse_id`` of the one warehouse the extension exports, but the 1C
+    extension finalises stock with no ``warehouse_id`` at all, so that rows of
+    a warehouse the export no longer covers are swept too (ADR-0004). Both are
+    unset for every other kind.
 
     Plain strings rather than value objects, because the projection is
     Core-only: nothing here is ever built into a domain value on its way in.
@@ -44,7 +47,7 @@ class CatalogScope:
 class CategoryRow:
     """One group of the 1C nomenclature reference.
 
-    Groups and products never share a table and never share a message: an
+    Groups and products never share a table and never share a batch: an
     element that is a group arrives here, an element that is a product arrives
     as a :class:`ProductRow`. That is a clause of the exchange contract rather
     than a flag on a row.
@@ -52,7 +55,7 @@ class CategoryRow:
     There is no ``path`` or ``depth`` here, although the projection stores
     both. They are computed where they are written, from the batch as a whole,
     which is possible only because the contract requires the category snapshot
-    to be complete in a single message.
+    to be complete in a single batch.
     """
 
     id: str
@@ -128,9 +131,13 @@ class StockRow:
     and reserved are not stored separately and will not be — that would be two
     columns and a second question the bot cannot answer correctly.
 
-    1C gives no warehouse breakdown today, so the consumer writes a fixed
-    ``'*'``; the storefront query sums with a group-by from the first day, so
-    real warehouses appearing changes neither the SQL nor this contract.
+    ``warehouse_id`` is the GUID of the one warehouse the 1C extension is
+    configured with, in its warehouse constant, so a run carries one
+    warehouse; only the seeder, reading
+    ``docs/design/catalog-snapshot.example.json``, writes ``'*'``. The
+    storefront query sums with a group-by over ``product_id`` from the first
+    day, so more warehouses appearing changes neither the SQL nor this
+    contract.
     """
 
     product_id: str
@@ -146,11 +153,11 @@ class PriceTypeBindingRow:
     Not by ``user_id``, and that is the whole point of the table. In 1C the
     price list belongs to a counterparty, and a counterparty may well not have
     registered in the bot yet — a row keyed by user id would have nowhere to go
-    and the message would be dropped, after which the customer would silently
-    get default prices forever, because nobody re-sends bindings.
+    and the row would be dropped, after which the customer would silently get
+    default prices forever, because nobody re-sends bindings.
 
-    ``source_counterparty_id`` exists so the consumer need not resolve the
-    counterparty again on every message. It reaches no query and no domain
+    ``source_counterparty_id`` exists so the receiver need not resolve the
+    counterparty again on every batch. It reaches no query and no domain
     object: there is no counterparty in this domain, literally.
     """
 
@@ -178,13 +185,13 @@ class CatalogSnapshot:
     reads a 1C attribute by its 1C name. Whatever 1C actually sends — a
     ``Номенклатура`` element with ``ЭтоГруппа``, an ``Артикул`` that is blank
     and a ``Код`` that never is, a price register keyed by ``ВидЦен`` — is the
-    business of the adapter that receives it: today ``JsonFileCatalogSource``
-    with the mapper behind it, tomorrow the HTTP receiver 1C posts to. That is
-    where a 1C attribute is renamed, a blank article is replaced by the code,
-    and a number is turned into text. When the real export turns out to be
-    shaped differently from the fixture, the mapper changes and this file does
-    not; and if a fact 1C sends turns out to be needed here, a row grows a
-    field with a name of ours.
+    business of the adapter that receives it: ``JsonFileCatalogSource`` for
+    the seeder and the HTTP receiver 1C posts to, with the same mapper behind
+    both. That is where a 1C attribute is renamed, a blank article is replaced
+    by the code, and a number is turned into text. When the real export turns
+    out to be shaped differently from the fixture, the mapper changes and this
+    file does not; and if a fact 1C sends turns out to be needed here, a row
+    grows a field with a name of ours.
     """
 
     batch_id: str

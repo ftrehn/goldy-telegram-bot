@@ -16,16 +16,16 @@ logger: Final[logging.Logger] = logging.getLogger(__name__)
 class JsonFileCatalogSource(CatalogSource):
     """Reads one catalog batch out of a JSON file.
 
-    The seeder's source and nothing more. The RabbitMQ consumer that replaces
-    it pushes rather than pulls and will not implement this port at all — the
-    seam of the integration is ``ImportCatalogCommand``, which both of them
-    send.
+    The seeder's source and nothing more. The HTTP receiver 1C posts to pushes
+    rather than pulls and does not implement this port at all — the seam of
+    the integration is ``ImportCatalogCommand``, which the seeder and the
+    receiver both send.
 
     Two jobs, and only the first is this class's own: getting text off the
     disk and decoding it as JSON. Whether what came out is a snapshot is the
     mapper's question, injected through the constructor so the HTTP receiver
-    that comes later asks the same one of a request body — and so the reading
-    of the contract can change without this file changing.
+    asks the same one of a request body — and so the reading of the contract
+    can change without this file changing.
 
     The path arrives in the constructor as request-scoped context, because it
     comes from ``--file`` on the command line and belongs to one run rather

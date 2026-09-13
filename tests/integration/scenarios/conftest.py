@@ -203,7 +203,7 @@ def register_manager(
 
 @pytest.fixture()
 def publish_catalog(send_worker_command: CommandSender) -> CatalogPublisher:
-    """Imports one batch, as the seeder and the 1C consumer both do.
+    """Imports one batch, as the seeder and the receiver 1C posts to both do.
 
     Sent through the worker's container rather than the bot's, and that is the
     point of arranging it here: an import is nobody's request, so it must not

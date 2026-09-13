@@ -4,7 +4,10 @@ from typing import Final
 from dishka import AsyncContainer, Provider, make_async_container
 
 from goldy.setup.ioc.containers.common import common_providers
-from goldy.setup.ioc.providers import catalog_source_provider
+from goldy.setup.ioc.providers import (
+    catalog_snapshot_mapper_provider,
+    catalog_source_provider,
+)
 
 
 def catalog_seed_providers() -> Iterable[Provider]:
@@ -19,9 +22,14 @@ def catalog_seed_providers() -> Iterable[Provider]:
     catalog is nobody's request, so this container must refuse to resolve
     anything that expects a customer. If a handler ever appears here that needs
     one, this is where it shows up.
+
+    The mapper and the file source are two groups because the receiver takes
+    the first without the second: the same reading of the contract, applied
+    to a body 1C posted rather than to a file named on the command line.
     """
     return (
         *common_providers(),
+        catalog_snapshot_mapper_provider(),
         catalog_source_provider(),
     )
 

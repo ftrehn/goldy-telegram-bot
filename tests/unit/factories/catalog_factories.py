@@ -167,13 +167,14 @@ def make_price_row(
     amount: str = UNIT_PRICE,
     currency: str = "rub",
     price_type_id: str = PRICE_TYPE_ID,
+    source_changed_at: datetime | None = SOURCE_CHANGED_AT,
 ) -> PriceRow:
     return PriceRow(
         product_id=make_product_id_value(index),
         price_type_id=price_type_id,
         amount=Decimal(amount),
         currency=currency,
-        source_changed_at=SOURCE_CHANGED_AT,
+        source_changed_at=source_changed_at,
     )
 
 
@@ -230,3 +231,29 @@ def make_snapshot(
         stock=stock,
         price_type_bindings=bindings,
     )
+
+
+def make_batch_product() -> dict[str, str]:
+    """One product as 1C spells it in a batch body: the four mandatory fields."""
+    return {
+        "id": "3b7d5e60-0000-4000-8000-00000000000a",
+        "sku": "AB-12345",
+        "name": "Болт оцинкованный",
+        "unit_name": "шт",
+    }
+
+
+def make_batch_document(**overrides: object) -> dict[str, object]:
+    """The smallest batch body the mapper accepts, with whatever a test changes.
+
+    A JSON document rather than a snapshot, because what the receiver tests
+    exercise is the turn of a body into a command, and that starts before the
+    mapper has made a row of anything. Values are ``object`` on purpose: an
+    override is as often a wrong shape as a right one.
+    """
+    return {
+        "batch_id": "ut-20260913-120000-abcd1234",
+        "scope": {"kind": "products"},
+        "products": [make_batch_product()],
+        **overrides,
+    }

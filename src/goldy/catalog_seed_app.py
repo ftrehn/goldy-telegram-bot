@@ -4,10 +4,11 @@ Run with::
 
     python -m goldy.catalog_seed_app --file fixtures/catalog.json
 
-A fourth process rather than a flag on the bot, because filling the catalog is
-not something a running bot should be able to do to itself: the job opens no
-broker, serves nobody and exits. Until 1C is on the other end of the queue,
-this is how the projection gets its contents.
+A separate entry point rather than a flag on the bot, because filling the
+catalog is not something a running bot should be able to do to itself: the job
+opens no broker, serves nobody and exits. This is the offline way to fill the
+projection from a file; in production 1C posts the same batches to the catalog
+receiver.
 """
 
 import argparse

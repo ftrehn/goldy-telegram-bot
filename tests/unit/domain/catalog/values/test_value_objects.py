@@ -5,6 +5,8 @@ from goldy.domain.catalog.errors import (
     EmptySkuError,
     EmptySourceIdError,
     EmptyUnitOfMeasureError,
+    MalformedProductNameError,
+    MalformedSkuError,
     TooLongProductNameError,
     TooLongSkuError,
     TooLongSourceIdError,
@@ -155,15 +157,21 @@ def test_a_priced_product_carries_the_price_this_customer_pays() -> None:
     assert priced.unit_price == make_money("49.50")
 
 
-def test_a_product_1c_gave_no_article_is_still_a_priced_product() -> None:
-    """The article is optional in 1C, and products without one are ordinary.
+def test_a_sku_with_a_control_character_is_a_broken_export() -> None:
+    """A tab or a line feed is never part of an article."""
+    with pytest.raises(MalformedSkuError):
+        Sku(value="AB-12\t345")
 
-    A mandatory ``Sku`` here would not break the import — the projection builds
-    no values — it would break the customer's "place order" button.
-    """
-    priced = make_priced_product(index=4, with_sku=False)
 
-    assert priced.sku is None
+def test_a_sku_made_of_digits_is_still_text() -> None:
+    """``"00123"`` and ``"123"`` name different products, so no number is parsed."""
+    assert Sku(value="00123") != Sku(value="123")
+
+
+def test_a_product_name_with_a_control_character_is_refused() -> None:
+    """A NUL in the middle of a name is a broken export, never a product."""
+    with pytest.raises(MalformedProductNameError):
+        ProductName(value="Болт " + chr(0) + " оцинкованный")
 
 
 def test_catalog_values_compare_by_value() -> None:

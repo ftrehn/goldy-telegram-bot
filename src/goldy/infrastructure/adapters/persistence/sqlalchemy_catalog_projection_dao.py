@@ -20,7 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from goldy.application.common.ports.catalog import (
-    CatalogProjectionGateway,
+    CatalogProjectionDao,
     CatalogScope,
     CatalogScopeKind,
     CategoryRow,
@@ -58,8 +58,12 @@ SUPPORTED_CURRENCIES: Final[frozenset[str]] = frozenset(
 )
 
 
-class SqlAlchemyCatalogProjectionGateway(CatalogProjectionGateway):
+class SqlAlchemyCatalogProjectionDao(CatalogProjectionDao):
     """The only writer of the catalog projection.
+
+    A DAO by name and by shape: batches in, conditional upserts and sweeps
+    out, a count of rows touched for the import log. No aggregate is loaded
+    or built here, which is what separates it from the gateways beside it.
 
     Every upsert is conditional on ``source_changed_at`` rather than merely
     keyed by identifier, and that condition is what makes a repeated delivery

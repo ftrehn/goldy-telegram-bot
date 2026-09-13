@@ -146,7 +146,7 @@ def shop_handlers_provider() -> Provider:
     part of the shop a handler belongs to but whether it can answer "who is
     buying". Every handler here reaches ``IdentityProvider`` sooner or later -
     the cart and order ones directly or through ``UserProvider``, the catalog
-    ones through ``PriceTypeProvider``, because a price without a customer is
+    ones through ``PriceTypeResolver``, because a price without a customer is
     not a price.
 
     ``ListCategoriesHandler`` is the one that genuinely needs nobody: a group

@@ -5,10 +5,14 @@ from aiogram import Bot
 from dishka import Provider, Scope
 
 from goldy.application.commands.notifications.dispatcher import NotificationDispatcher
+from goldy.application.commands.notifications.senders import NotificationSenders
 from goldy.application.common.ports.notifications import (
     InboxGateway,
     NotificationRenderer,
     NotificationSender,
+)
+from goldy.application.common.services.notification_recipient_resolver import (
+    NotificationRecipientResolver,
 )
 from goldy.infrastructure.adapters.notifications.aiogram_notification_sender import (
     AiogramNotificationSender,
@@ -56,6 +60,16 @@ def make_notification_renderer() -> NotificationRenderer:
     return FluentNotificationRenderer(NOTIFICATION_LOCALES_PATH)
 
 
+def make_notification_senders(sender: NotificationSender) -> NotificationSenders:
+    """Every sender this worker holds, which today is the Telegram one.
+
+    MAX will be a second argument here and nothing else: the dispatcher asks
+    the registry for the sender behind a person's platform and never learns
+    how many there are.
+    """
+    return NotificationSenders([sender])
+
+
 def notifications_provider() -> Provider:
     """Everything needed to write to a person, and only the worker gets it.
 
@@ -66,12 +80,12 @@ def notifications_provider() -> Provider:
     resolve a Bot API client, and a handler that has no business sending
     anything discover at runtime that it can.
 
-    The sender and the renderer are ``APP``-scoped because both are expensive
-    to build and hold nothing belonging to one message — an HTTP session and a
-    set of parsed translation files. The inbox gateway is ``REQUEST``, like
-    every other gateway: it writes through the session that message's
-    transaction is opened on, which is what makes the claim and the sending
-    commit together.
+    ``APP`` scope for what is expensive to build and belongs to the process —
+    the Bot API client with its HTTP session, and the parsed translation files.
+    ``REQUEST`` for everything else, the sender included: it holds nothing but
+    a reference to the process-wide ``Bot``, so nothing is gained by keeping
+    one alive for the lifetime of the worker, and every other collaborator a
+    message is handled with lives exactly as long as the message.
     """
     provider: Final[Provider] = Provider(scope=Scope.REQUEST)
     provider.from_context(provides=NotificationConfig, scope=Scope.APP)
@@ -81,11 +95,9 @@ def notifications_provider() -> Provider:
         provides=NotificationRenderer,
         scope=Scope.APP,
     )
-    provider.provide(
-        source=AiogramNotificationSender,
-        provides=NotificationSender,
-        scope=Scope.APP,
-    )
+    provider.provide(source=AiogramNotificationSender, provides=NotificationSender)
+    provider.provide(make_notification_senders, provides=NotificationSenders)
+    provider.provide(source=NotificationRecipientResolver)
     provider.provide(source=SqlAlchemyInboxGateway, provides=InboxGateway)
     provider.provide(source=NotificationDispatcher)
     return provider

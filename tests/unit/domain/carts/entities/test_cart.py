@@ -182,12 +182,12 @@ def test_total_quantity_counts_pieces_and_line_count_counts_products() -> None:
     assert cart.total_quantity == 7
 
 
-def test_the_cart_records_nothing_whatever_is_done_to_it() -> None:
-    """Editing a draft is not a fact anyone reacts to.
+def test_every_change_to_the_cart_is_recorded_as_a_fact() -> None:
+    """The aggregate takes an ``EventsCollection`` and honours it.
 
-    Everything an aggregate records is drained into the outbox and published;
-    pressing ``+`` three times and ``-`` once would put four messages on a
-    queue nobody consumes. The single business fact here is ``OrderPlaced``.
+    A cart that accepted the collection and wrote nothing into it would be a
+    promise the command gateway keeps for nobody; the day somebody wants to
+    know what is abandoned in carts, the facts are already in the outbox.
     """
     cart = make_cart()
 
@@ -198,4 +198,28 @@ def test_the_cart_records_nothing_whatever_is_done_to_it() -> None:
     cart.remove_item(make_product_id(1))
     cart.clear()
 
-    assert emitted_event_names(cart.events_collection) == []
+    assert emitted_event_names(cart.events_collection) == [
+        "CartCreated",
+        "CartItemAdded",
+        "CartItemAdded",
+        "CartItemQuantityChanged",
+        "CartItemQuantityChanged",
+        "CartItemRemoved",
+    ]
+
+
+def test_taking_the_last_piece_off_a_line_is_recorded_as_a_removal() -> None:
+    cart = make_cart({1: 1})
+
+    cart.decrease_item(make_product_id(1))
+
+    assert emitted_event_names(cart.events_collection)[-1] == "CartItemRemoved"
+
+
+def test_clearing_a_cart_that_holds_something_is_recorded_once() -> None:
+    cart = make_cart({1: 2, 2: 1})
+
+    cart.clear()
+    cart.clear()
+
+    assert emitted_event_names(cart.events_collection).count("CartCleared") == 1

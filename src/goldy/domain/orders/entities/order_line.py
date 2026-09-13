@@ -21,12 +21,13 @@ class OrderLine:
     repeat an order and so a future export can point at the right item; nothing
     displayed is ever read through it.
 
-    ``sku`` may be missing because the article is an optional attribute in 1C,
-    and a strict article here would refuse to place an order for a product the
-    shop sells perfectly well. ``unit`` is part of the snapshot for the
-    opposite reason: a quantity without its unit means nothing to the customer,
-    and looking the unit up in the catalog at display time would undo the
-    snapshot.
+    ``sku`` is always there. The article is what a customer reads out to a
+    manager and what a manager types into 1C, and a line without one would
+    be a line nobody can talk about; the exchange contract guarantees every
+    product carries one by sending the 1C code where the article is blank.
+    ``unit`` is part of the snapshot for a neighbouring reason: a quantity
+    without its unit means nothing to the customer, and looking the unit up
+    in the catalog at display time would undo the snapshot.
 
     Its key is ``(order_id, position)``, not ``(order_id, product_id)``: the
     line number is what the tabular part of a 1C document is addressed by, and
@@ -43,7 +44,7 @@ class OrderLine:
 
     position: int
     product_id: ProductId
-    sku: Sku | None
+    sku: Sku
     name: ProductName
     unit: UnitOfMeasure
     unit_price: Money

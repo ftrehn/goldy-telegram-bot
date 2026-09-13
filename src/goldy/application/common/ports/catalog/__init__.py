@@ -1,4 +1,4 @@
-from .catalog_projection_gateway import CatalogProjectionGateway
+from .catalog_projection_dao import CatalogProjectionDao
 from .catalog_query_gateway import CatalogQueryGateway
 from .catalog_snapshot import (
     CatalogScope,
@@ -12,10 +12,11 @@ from .catalog_snapshot import (
     StockRow,
 )
 from .catalog_source import CatalogSource
-from .pricing_gateway import PricingGateway
+from .pricing_reader import CartPrices, PricingReader, ResolvedPriceType
 
 __all__ = [
-    "CatalogProjectionGateway",
+    "CartPrices",
+    "CatalogProjectionDao",
     "CatalogQueryGateway",
     "CatalogScope",
     "CatalogScopeKind",
@@ -25,7 +26,8 @@ __all__ = [
     "PriceRow",
     "PriceTypeBindingRow",
     "PriceTypeRow",
-    "PricingGateway",
+    "PricingReader",
     "ProductRow",
+    "ResolvedPriceType",
     "StockRow",
 ]

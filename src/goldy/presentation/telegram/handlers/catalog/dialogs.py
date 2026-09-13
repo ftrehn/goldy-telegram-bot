@@ -33,6 +33,7 @@ from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.input import MessageInput
 from aiogram_dialog.widgets.kbd import (
     Button,
+    Cancel,
     Counter,
     Group,
     Row,
@@ -45,7 +46,7 @@ from aiogram_dialog.widgets.text import Format
 
 from goldy.domain.common.values.quantity import MAX_QUANTITY
 from goldy.presentation.telegram.common import text_keys
-from goldy.presentation.telegram.common.paging import paging_row
+from goldy.presentation.telegram.common.paging import paging_widgets
 from goldy.presentation.telegram.common.widgets import I18NFormat
 from goldy.presentation.telegram.handlers.cart.states import CartStates
 from goldy.presentation.telegram.handlers.catalog.callbacks import (
@@ -55,7 +56,6 @@ from goldy.presentation.telegram.handlers.catalog.callbacks import (
     on_card_back,
     on_category_selected,
     on_category_up,
-    on_close,
     on_dialog_start,
     on_product_selected,
     on_result_selected,
@@ -64,8 +64,8 @@ from goldy.presentation.telegram.handlers.catalog.callbacks import (
     on_sort_toggled,
 )
 from goldy.presentation.telegram.handlers.catalog.getters import (
-    PRODUCTS_PAGE_KEY,
-    RESULTS_PAGE_KEY,
+    PRODUCTS_SCROLL_ID,
+    RESULTS_SCROLL_ID,
     card_getter,
     categories_getter,
     description_getter,
@@ -113,7 +113,7 @@ CATALOG_DIALOG: Final[Dialog] = Dialog(
             on_click=on_category_up,
             when=~F["is_root"],
         ),
-        Button(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close", on_click=on_close),
+        Cancel(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close"),
         MessageInput(on_search_typed, content_types=[ContentType.TEXT]),
         state=CatalogStates.CATEGORIES,
         getter=categories_getter,
@@ -137,7 +137,7 @@ CATALOG_DIALOG: Final[Dialog] = Dialog(
             ),
             width=1,
         ),
-        paging_row(key=PRODUCTS_PAGE_KEY, id_prefix="products"),
+        *paging_widgets(PRODUCTS_SCROLL_ID),
         Row(
             Button(
                 I18NFormat(text_keys.CATALOG_SORT_BUTTON, sort=Format("{sort}")),
@@ -257,7 +257,7 @@ CATALOG_DIALOG: Final[Dialog] = Dialog(
             ),
             width=1,
         ),
-        paging_row(key=RESULTS_PAGE_KEY, id_prefix="results"),
+        *paging_widgets(RESULTS_SCROLL_ID),
         Row(
             SwitchTo(
                 I18NFormat(text_keys.CATALOG_SEARCH_AGAIN_BUTTON),

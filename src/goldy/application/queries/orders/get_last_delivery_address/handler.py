@@ -3,13 +3,14 @@ from typing import Final, override
 from goldy.application.common.mediator.handlers import QueryHandler
 from goldy.application.common.ports.identity_provider import IdentityProvider
 from goldy.application.common.ports.orders import OrderQueryGateway
+from goldy.application.common.views.order import LastDeliveryAddressView
 from goldy.application.queries.orders.get_last_delivery_address.query import (
     GetLastDeliveryAddressQuery,
 )
 
 
 class GetLastDeliveryAddressHandler(
-    QueryHandler[GetLastDeliveryAddressQuery, str | None]
+    QueryHandler[GetLastDeliveryAddressQuery, LastDeliveryAddressView]
 ):
     """Reads back the address of the caller's most recent order.
 
@@ -37,12 +38,18 @@ class GetLastDeliveryAddressHandler(
         self._order_query_gateway: Final[OrderQueryGateway] = order_query_gateway
 
     @override
-    async def handle(self, query: GetLastDeliveryAddressQuery) -> str | None:
-        """The address of the previous order, or nothing on a first one.
+    async def handle(
+        self,
+        query: GetLastDeliveryAddressQuery,
+    ) -> LastDeliveryAddressView:
+        """The address of the previous order, or an empty view on a first one.
 
         Raises:
             AuthenticationError: the account writing to us belongs to nobody.
         """
         customer_id = await self._identity_provider.get_current_user_id()
+        address = await self._order_query_gateway.read_last_delivery_address(
+            customer_id,
+        )
 
-        return await self._order_query_gateway.read_last_delivery_address(customer_id)
+        return LastDeliveryAddressView(address=address)

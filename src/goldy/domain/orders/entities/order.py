@@ -37,7 +37,6 @@ from goldy.domain.orders.values.recipient import Recipient
 from goldy.domain.users.values.user_id import UserId
 
 if TYPE_CHECKING:
-    from goldy.domain.common.event import Event
     from goldy.domain.common.events_collection import EventsCollection
     from goldy.domain.orders.placement import Placement
 
@@ -73,6 +72,16 @@ class Order(Aggregate[OrderId]):
     future method that edits the contents of a placed order has to be written
     with that in mind.
 
+    :attr:`number` is derived rather than drawn: ``OrderNumber.derive`` spells
+    it from the moment of placement and the order's own id, so placing an
+    order needs no counter and no round trip, and this method stays
+    synchronous like everything else in the domain.
+
+    :attr:`cancelled_by` says *which side* stopped the order and
+    :attr:`cancelled_by_user_id` says *who*: the side is what the rules
+    branch on, the person is what a manager reading the card wants to see —
+    "cancelled by staff" explains less than "cancelled by Ivanova".
+
     :attr:`price_type_id` is mandatory. The pricing service always resolves a
     price type by construction — the one bound to the customer, or the one
     configured as the default — and the case "no price list is configured at
@@ -106,17 +115,22 @@ class Order(Aggregate[OrderId]):
     comment: OrderComment | None = field(default=None)
     cancellation_reason: CancellationReason | None = field(default=None)
     cancelled_by: CancellationInitiator | None = field(default=None)
+    cancelled_by_user_id: UserId | None = field(default=None)
 
     @classmethod
     def place(
         cls,
         *,
         order_id: OrderId,
-        order_number: OrderNumber,
         events_collection: EventsCollection,
         placement: Placement,
     ) -> Self:
         """Creates the order from finished lines and records ``OrderPlaced``.
+
+        The number is spelled from the id and the moment of placement, and
+        that moment is also ``created_at``: the two are one fact, and a number
+        derived from a different clock reading than the timestamp it sits
+        beside would be a puzzle for whoever compares them.
 
         Raises:
             EmptyOrderError: there are no lines, so there is nothing to buy.
@@ -124,14 +138,21 @@ class Order(Aggregate[OrderId]):
                 currency.
         """
         if not placement.lines:
-            msg = f"Order '{order_number}' must have at least one line."
+            msg = (
+                f"Order for customer '{placement.customer_id}' must have "
+                f"at least one line."
+            )
             raise EmptyOrderError(msg)
 
         _ensure_single_currency(placement.lines)
 
+        placed_at = datetime.now(UTC)
+        order_number = OrderNumber.derive(placed_at=placed_at, order_id=order_id)
         order = cls(
             id=order_id,
             events_collection=events_collection,
+            created_at=placed_at,
+            updated_at=placed_at,
             number=order_number,
             customer_id=placement.customer_id,
             delivery_address=placement.delivery_address,
@@ -184,9 +205,10 @@ class Order(Aggregate[OrderId]):
         self,
         *,
         initiated_by: CancellationInitiator,
+        cancelled_by_user_id: UserId,
         reason: CancellationReason | None = None,
     ) -> None:
-        """Stops the order, recording who stopped it and why.
+        """Stops the order, recording which side stopped it, who exactly, and why.
 
         The two initiators are held to different rules, and both are decidable
         from this aggregate's own fields plus the initiator handed in. A
@@ -195,6 +217,10 @@ class Order(Aggregate[OrderId]):
         accepted for picking. A manager may stop anything unfinished but has to
         say why, because the customer is about to be told and "cancelled" on
         its own explains nothing.
+
+        ``cancelled_by_user_id`` is the person behind the initiator. For a
+        customer it repeats ``customer_id``; for staff it is the one fact the
+        initiator alone cannot give — which of the managers did it.
 
         Raises:
             CustomerCannotCancelProcessedOrderError: the customer is trying to
@@ -218,6 +244,7 @@ class Order(Aggregate[OrderId]):
 
         self._change_status(OrderStatus.CANCELLED, reason=reason)
         self.cancelled_by = initiated_by
+        self.cancelled_by_user_id = cancelled_by_user_id
         self.cancellation_reason = reason
 
     def change_delivery_address(self, delivery_address: DeliveryAddress) -> None:
@@ -239,8 +266,8 @@ class Order(Aggregate[OrderId]):
 
         old_address = self.delivery_address
         self.delivery_address = delivery_address
-        self._touch()
-        self._record(
+        self.updated_at = datetime.now(UTC)
+        self.events_collection.add_event(
             OrderDeliveryAddressChanged(
                 order_id=self.id,
                 order_number=str(self.number),
@@ -295,7 +322,7 @@ class Order(Aggregate[OrderId]):
         """
         old_status = self.status
         self._transition_to(status)
-        self._record(
+        self.events_collection.add_event(
             OrderStatusChanged(
                 order_id=self.id,
                 order_number=str(self.number),
@@ -320,10 +347,4 @@ class Order(Aggregate[OrderId]):
             raise OrderStatusTransitionError(msg)
 
         self.status = status
-        self._touch()
-
-    def _touch(self) -> None:
         self.updated_at = datetime.now(UTC)
-
-    def _record(self, event: Event) -> None:
-        self.events_collection.add_event(event)

@@ -26,7 +26,7 @@ from goldy.application.commands.catalog.import_catalog.command import (
 from goldy.application.common.ports.catalog import (
     CatalogScopeKind,
     CatalogSnapshot,
-    PricingGateway,
+    PricingReader,
 )
 from tests.integration.arrange import CommandSender, UserSeeder
 from tests.integration.inject import inject
@@ -41,7 +41,6 @@ from tests.unit.factories.catalog_factories import (
 )
 from tests.unit.factories.domain_factories import CUSTOMER_PHONE, MANAGER_PHONE
 from tests.unit.factories.shop_factories import (
-    PRICE_TYPE_ID,
     make_price_type_id,
     make_product_id,
 )
@@ -64,7 +63,7 @@ UNBOUND_ACCOUNT_ID: str = "700101"
 async def test_a_bound_customer_buys_at_the_list_the_catalog_gave_them(
     seed_user: UserSeeder,
     send_worker_command: CommandSender,
-    pricing: FromDishka[PricingGateway],
+    pricing: FromDishka[PricingReader],
 ) -> None:
     """The price list and the price, because resolving one is only half the job."""
     seeded = await seed_user(phone_number=CUSTOMER_PHONE)
@@ -73,12 +72,9 @@ async def test_a_bound_customer_buys_at_the_list_the_catalog_gave_them(
     resolved = await pricing.read_price_type_for(seeded.id)
 
     assert resolved is not None
-    assert resolved.price_type_id == RETAIL_PRICE_TYPE_ID
-    [priced] = await pricing.read_priced_products(
-        [make_product_id(1)],
-        make_price_type_id(resolved.price_type_id),
-    )
-    assert priced.unit_price is not None
+    assert resolved.price_type_id == make_price_type_id(RETAIL_PRICE_TYPE_ID)
+    prices = await pricing.read_cart_prices([make_product_id(1)], resolved.price_type_id)
+    [priced] = prices.priced_products
     assert priced.unit_price.amount == Decimal(RETAIL_AMOUNT)
 
 
@@ -86,7 +82,7 @@ async def test_a_bound_customer_buys_at_the_list_the_catalog_gave_them(
 async def test_a_customer_the_catalog_never_mentioned_buys_at_the_configured_list(
     seed_user: UserSeeder,
     send_worker_command: CommandSender,
-    pricing: FromDishka[PricingGateway],
+    pricing: FromDishka[PricingReader],
 ) -> None:
     """No binding is the ordinary state of a new customer, not a failure."""
     seeded = await seed_user(
@@ -98,12 +94,9 @@ async def test_a_customer_the_catalog_never_mentioned_buys_at_the_configured_lis
     resolved = await pricing.read_price_type_for(seeded.id)
 
     assert resolved is not None
-    assert resolved.price_type_id == PRICE_TYPE_ID
-    [priced] = await pricing.read_priced_products(
-        [make_product_id(1)],
-        make_price_type_id(resolved.price_type_id),
-    )
-    assert priced.unit_price is not None
+    assert resolved.price_type_id == make_price_type_id()
+    prices = await pricing.read_cart_prices([make_product_id(1)], resolved.price_type_id)
+    [priced] = prices.priced_products
     assert priced.unit_price.amount == Decimal(WHOLESALE_AMOUNT)
 
 
@@ -111,7 +104,7 @@ async def test_a_customer_the_catalog_never_mentioned_buys_at_the_configured_lis
 async def test_a_binding_waits_for_the_person_it_names_to_register(
     seed_user: UserSeeder,
     send_worker_command: CommandSender,
-    pricing: FromDishka[PricingGateway],
+    pricing: FromDishka[PricingReader],
 ) -> None:
     """The whole reason the binding is keyed by phone number.
 
@@ -126,14 +119,14 @@ async def test_a_binding_waits_for_the_person_it_names_to_register(
 
     resolved = await pricing.read_price_type_for(seeded.id)
     assert resolved is not None
-    assert resolved.price_type_id == RETAIL_PRICE_TYPE_ID
+    assert resolved.price_type_id == make_price_type_id(RETAIL_PRICE_TYPE_ID)
 
 
 @inject
 async def test_a_binding_withdrawn_in_the_source_stops_applying(
     seed_user: UserSeeder,
     send_worker_command: CommandSender,
-    pricing: FromDishka[PricingGateway],
+    pricing: FromDishka[PricingReader],
 ) -> None:
     """Swept like the rest of the projection, which is why the row is batched.
 
@@ -152,14 +145,14 @@ async def test_a_binding_withdrawn_in_the_source_stops_applying(
 
     resolved = await pricing.read_price_type_for(seeded.id)
     assert resolved is not None
-    assert resolved.price_type_id == PRICE_TYPE_ID
+    assert resolved.price_type_id == make_price_type_id()
 
 
 @inject
 async def test_a_price_list_in_a_currency_we_do_not_know_comes_back_marked(
     seed_user: UserSeeder,
     send_worker_command: CommandSender,
-    pricing: FromDishka[PricingGateway],
+    pricing: FromDishka[PricingReader],
 ) -> None:
     """Stored rather than dropped, so the customer gets a refusal and not roubles."""
     seeded = await seed_user(phone_number=CUSTOMER_PHONE)
@@ -180,14 +173,14 @@ async def test_a_price_list_in_a_currency_we_do_not_know_comes_back_marked(
     resolved = await pricing.read_price_type_for(seeded.id)
 
     assert resolved is not None
-    assert resolved.price_type_id == EXOTIC_PRICE_TYPE_ID
+    assert resolved.price_type_id == make_price_type_id(EXOTIC_PRICE_TYPE_ID)
     assert resolved.is_supported is False
 
 
 @inject
 async def test_an_empty_projection_resolves_no_price_list_at_all(
     seed_user: UserSeeder,
-    pricing: FromDishka[PricingGateway],
+    pricing: FromDishka[PricingReader],
 ) -> None:
     """A broken snapshot rather than an ordinary absence, and told apart from one."""
     seeded = await seed_user(phone_number=CUSTOMER_PHONE)
@@ -201,24 +194,26 @@ async def test_an_empty_projection_resolves_no_price_list_at_all(
 async def test_a_product_this_list_does_not_price_comes_back_unpriced(
     seed_user: UserSeeder,
     send_worker_command: CommandSender,
-    pricing: FromDishka[PricingGateway],
+    pricing: FromDishka[PricingReader],
 ) -> None:
     """Present without a price and absent altogether are two different refusals.
 
     Collapsing them would turn "we no longer sell this" into "ask a manager
     about the price", which is the wrong thing to tell a customer at checkout.
+    Product 3 was never imported at all, and comes back on neither side.
     """
     await seed_user(phone_number=CUSTOMER_PHONE)
     await send_worker_command(ImportCatalogCommand(snapshot=_two_price_lists()))
 
-    priced = await pricing.read_priced_products(
-        [make_product_id(1), make_product_id(2)],
+    prices = await pricing.read_cart_prices(
+        [make_product_id(1), make_product_id(2), make_product_id(3)],
         make_price_type_id(RETAIL_PRICE_TYPE_ID),
     )
 
-    by_id = {row.product_id: row for row in priced}
-    assert by_id[make_product_id(1).value].unit_price is not None
-    assert by_id[make_product_id(2).value].unit_price is None
+    assert [priced.product_id for priced in prices.priced_products] == [
+        make_product_id(1),
+    ]
+    assert list(prices.unpriced_product_ids) == [make_product_id(2)]
 
 
 def _two_price_lists() -> CatalogSnapshot:

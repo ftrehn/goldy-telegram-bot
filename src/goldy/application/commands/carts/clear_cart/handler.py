@@ -2,11 +2,9 @@ from typing import Final, override
 
 from goldy.application.commands.carts.clear_cart.command import ClearCartCommand
 from goldy.application.common.mediator.handlers import CommandHandler
-from goldy.application.common.ports.carts import CartCommandGateway
-from goldy.application.common.ports.identity_provider import IdentityProvider
 from goldy.application.common.ports.mappers import CartSummaryViewMapper
+from goldy.application.common.services.cart_provider import CartProvider
 from goldy.application.common.views.cart import CartSummaryView
-from goldy.application.error import CartNotFoundError
 
 
 class ClearCartHandler(CommandHandler[ClearCartCommand, CartSummaryView]):
@@ -26,24 +24,17 @@ class ClearCartHandler(CommandHandler[ClearCartCommand, CartSummaryView]):
 
     def __init__(
         self,
-        identity_provider: IdentityProvider,
-        cart_command_gateway: CartCommandGateway,
+        cart_provider: CartProvider,
         cart_summary_view_mapper: CartSummaryViewMapper,
     ) -> None:
-        self._identity_provider: Final[IdentityProvider] = identity_provider
-        self._cart_command_gateway: Final[CartCommandGateway] = cart_command_gateway
+        self._cart_provider: Final[CartProvider] = cart_provider
         self._cart_summary_view_mapper: Final[CartSummaryViewMapper] = (
             cart_summary_view_mapper
         )
 
     @override
     async def handle(self, command: ClearCartCommand) -> CartSummaryView:
-        user_id = await self._identity_provider.get_current_user_id()
-        cart = await self._cart_command_gateway.by_user_id(user_id)
-
-        if cart is None:
-            msg = f"User '{user_id}' has no cart."
-            raise CartNotFoundError(msg)
+        cart = await self._cart_provider.current()
 
         cart.clear()
 

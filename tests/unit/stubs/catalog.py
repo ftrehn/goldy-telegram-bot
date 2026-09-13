@@ -16,15 +16,17 @@ from dataclasses import dataclass
 from typing import final, override
 
 from goldy.application.common.ports.catalog import (
-    CatalogProjectionGateway,
+    CartPrices,
+    CatalogProjectionDao,
     CatalogQueryGateway,
     CatalogScope,
     CategoryRow,
     PriceRow,
     PriceTypeBindingRow,
     PriceTypeRow,
-    PricingGateway,
+    PricingReader,
     ProductRow,
+    ResolvedPriceType,
     StockRow,
 )
 from goldy.application.common.query_params.catalog_filters import (
@@ -35,14 +37,13 @@ from goldy.application.common.query_params.pagination import Pagination
 from goldy.application.common.query_params.search_term import SearchTerm
 from goldy.application.common.views.catalog import (
     CategoryView,
-    PriceTypeView,
-    PricedProductView,
     ProductListView,
     ProductSearchView,
     ProductView,
 )
 from goldy.domain.catalog.values.category_id import CategoryId
 from goldy.domain.catalog.values.price_type_id import PriceTypeId
+from goldy.domain.catalog.values.priced_product import PricedProduct
 from goldy.domain.catalog.values.product_id import ProductId
 from goldy.domain.users.values.user_id import UserId
 
@@ -85,11 +86,12 @@ class StubCatalogQueryGateway(CatalogQueryGateway):
         self.product_reads: list[tuple[ProductId, PriceTypeId]] = []
 
     @override
-    async def read_categories(
-        self,
-        parent_id: CategoryId | None,
-    ) -> Sequence[CategoryView]:
-        return self.children.get(None if parent_id is None else parent_id.value, ())
+    async def read_root_categories(self) -> Sequence[CategoryView]:
+        return self.children.get(None, ())
+
+    @override
+    async def read_subcategories(self, parent_id: CategoryId) -> Sequence[CategoryView]:
+        return self.children.get(parent_id.value, ())
 
     @override
     async def read_category(self, category_id: CategoryId) -> CategoryView | None:
@@ -151,33 +153,46 @@ class StubCatalogQueryGateway(CatalogQueryGateway):
 
 
 @final
-class StubPricingGateway(PricingGateway):
-    """Hands back the price type and the priced products a test chose."""
+class StubPricingReader(PricingReader):
+    """Hands back the price type and the priced products a test chose.
 
-    def __init__(self, price_type: PriceTypeView | None = None) -> None:
-        self.price_type: PriceTypeView | None = price_type
-        self.priced_products: tuple[PricedProductView, ...] = ()
+    ``priced_products`` are what the catalog prices; ``unpriced_product_ids``
+    are what it lists but does not price under this price type. A product in
+    neither is gone from the catalog, exactly as the real reader reports it.
+    """
+
+    def __init__(self, price_type: ResolvedPriceType | None = None) -> None:
+        self.price_type: ResolvedPriceType | None = price_type
+        self.priced_products: tuple[PricedProduct, ...] = ()
+        self.unpriced_product_ids: tuple[ProductId, ...] = ()
         self.asked_for: list[UserId] = []
 
     @override
-    async def read_price_type_for(self, user_id: UserId) -> PriceTypeView | None:
+    async def read_price_type_for(self, user_id: UserId) -> ResolvedPriceType | None:
         self.asked_for.append(user_id)
         return self.price_type
 
     @override
-    async def read_priced_products(
+    async def read_cart_prices(
         self,
         product_ids: Sequence[ProductId],
         price_type_id: PriceTypeId,
-    ) -> Sequence[PricedProductView]:
-        wanted = {product_id.value for product_id in product_ids}
-        return tuple(
-            priced for priced in self.priced_products if priced.product_id in wanted
+    ) -> CartPrices:
+        wanted = set(product_ids)
+        return CartPrices(
+            priced_products=tuple(
+                priced for priced in self.priced_products if priced.product_id in wanted
+            ),
+            unpriced_product_ids=tuple(
+                product_id
+                for product_id in self.unpriced_product_ids
+                if product_id in wanted
+            ),
         )
 
 
 @final
-class RecordingCatalogProjectionGateway(CatalogProjectionGateway):
+class RecordingCatalogProjectionDao(CatalogProjectionDao):
     """Keeps every row it was handed, together with the batch it came in.
 
     Each upsert reports the number of rows it was given, which is what the

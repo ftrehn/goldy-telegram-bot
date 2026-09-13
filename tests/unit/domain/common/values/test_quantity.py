@@ -21,15 +21,15 @@ def test_a_quantity_of_nothing_does_not_exist(value: int) -> None:
         make_quantity(value)
 
 
-def test_the_ceiling_is_ten_thousand_pieces() -> None:
+def test_the_ceiling_is_a_million_pieces() -> None:
     """Spelled out here, because every other test refers to the constant.
 
-    A shop with price types is a wholesale shop, and a thousand pieces of
-    ordinary fastenings is reached on the first real order. Without this line
-    the number could be taken back down to 999 with the whole run staying
-    green.
+    A shop with price types is a wholesale shop: two hundred thousand tiles
+    for one site is a large order, not an impossible one, and a ceiling of ten
+    thousand would refuse it. Without this line the number could be taken back
+    down with the whole run staying green.
     """
-    assert MAX_QUANTITY == 10000
+    assert MAX_QUANTITY == 1_000_000
 
 
 def test_a_quantity_above_the_ceiling_is_refused() -> None:

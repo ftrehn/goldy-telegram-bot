@@ -196,11 +196,10 @@ async def test_the_address_of_the_previous_order_is_offered_back(
     acting_as(customer.id)
     order_query_gateway.last_delivery_address = DELIVERY_ADDRESS
 
-    address = await get_last_delivery_address_handler.handle(
-        GetLastDeliveryAddressQuery(),
-    )
+    last = await get_last_delivery_address_handler.handle(GetLastDeliveryAddressQuery())
 
-    assert address == DELIVERY_ADDRESS
+    assert last.address == DELIVERY_ADDRESS
+    assert last.is_known is True
     assert order_query_gateway.address_reads == [customer.id]
 
 
@@ -213,8 +212,7 @@ async def test_a_first_order_has_no_address_to_offer(
     customer = await seed_user(**CUSTOMER)
     acting_as(customer.id)
 
-    address = await get_last_delivery_address_handler.handle(
-        GetLastDeliveryAddressQuery(),
-    )
+    last = await get_last_delivery_address_handler.handle(GetLastDeliveryAddressQuery())
 
-    assert address is None
+    assert last.address is None
+    assert last.is_known is False

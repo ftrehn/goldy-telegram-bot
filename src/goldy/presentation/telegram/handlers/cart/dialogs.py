@@ -8,7 +8,7 @@ from aiogram_dialog.widgets.kbd import Button, Cancel, Group, Row, Select, Start
 from aiogram_dialog.widgets.text import Format, List
 
 from goldy.presentation.telegram.common import text_keys
-from goldy.presentation.telegram.common.paging import paging_row
+from goldy.presentation.telegram.common.paging import paging_widgets
 from goldy.presentation.telegram.common.widgets import I18NFormat
 from goldy.presentation.telegram.handlers.cart.callbacks import (
     on_cart_cleared,
@@ -20,6 +20,7 @@ from goldy.presentation.telegram.handlers.cart.callbacks import (
     on_unavailable_removed,
 )
 from goldy.presentation.telegram.handlers.cart.getters import (
+    CART_SCROLL_ID,
     cart_getter,
     line_getter,
     quantity_getter,
@@ -61,7 +62,7 @@ CART_DIALOG: Final[Dialog] = Dialog(
             ),
             width=1,
         ),
-        paging_row(),
+        *paging_widgets(CART_SCROLL_ID),
         Button(
             I18NFormat(text_keys.CART_REMOVE_UNAVAILABLE_BUTTON),
             id="remove_unavailable",

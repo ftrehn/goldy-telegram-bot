@@ -12,9 +12,12 @@ from typing import Final
 from goldy.application import error as application_errors
 from goldy.application.error import (
     ApplicationError,
+    CartAlreadyExistsError,
     CatalogSnapshotError,
     CatalogSourceError,
     DuplicateInboxMessageError,
+    NotificationChannelUnavailableError,
+    NotificationUndeliverableError,
     PaginationError,
 )
 from goldy.domain.carts import errors as cart_errors
@@ -44,6 +47,9 @@ ANSWERED_ELSEWHERE: Final[frozenset[type[AppError]]] = frozenset(
         DuplicateInboxMessageError,
         CatalogSourceError,
         CatalogSnapshotError,
+        CartAlreadyExistsError,
+        NotificationUndeliverableError,
+        NotificationChannelUnavailableError,
     },
 )
 """The classes that deliberately have no message of their own.
@@ -54,6 +60,9 @@ written afterwards, which is exactly the silence this test exists to prevent.
 than anybody's to act on — one is a bad call site, the other a redelivery the
 worker swallows on purpose. The two catalog ones are raised inside the seeder
 CLI, which has no chat to answer in and no i18n to answer with.
+``CartAlreadyExistsError`` never leaves ``CartProvider``, which answers it by
+taking the cart that won the race. The two notification errors are raised in
+the worker, where nobody is in a chat to read a message.
 """
 
 

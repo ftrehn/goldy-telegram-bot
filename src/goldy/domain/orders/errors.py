@@ -16,6 +16,14 @@ class TooShortDeliveryAddressError(DomainFieldError): ...
 class TooLongDeliveryAddressError(DomainFieldError): ...
 
 
+class ForeignDeliveryAddressError(DomainFieldError):
+    """The address is not written in Cyrillic, so it is not an address in Russia."""
+
+
+class IncompleteDeliveryAddressError(DomainFieldError):
+    """The address names no building — there is not a single digit in it."""
+
+
 class EmptyOrderCommentError(DomainFieldError): ...
 
 

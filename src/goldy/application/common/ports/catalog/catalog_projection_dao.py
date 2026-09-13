@@ -16,8 +16,17 @@ if TYPE_CHECKING:
     from goldy.domain.catalog.values.price_type_id import PriceTypeId
 
 
-class CatalogProjectionGateway(Protocol):
+class CatalogProjectionDao(Protocol):
     """The only way anything is ever written into the catalog projection.
+
+    A DAO and not a gateway, and the name is a promise about the shape of the
+    methods. A gateway in this project is thin — it hands whole aggregates
+    in and out and lets the unit of work do the writing — while this port
+    takes batches of rows and upserts them conditionally, sweeps by a stamp
+    and counts what it touched. That is data access written for throughput,
+    and calling it a gateway would invite somebody to expect an aggregate
+    behind it. There is none: the projection is Core-only and builds no
+    domain values on its way in.
 
     Upserts take a batch in and stamp ``batch_id`` on every row they touch;
     :meth:`finalize` removes what that batch did not mention. The two are

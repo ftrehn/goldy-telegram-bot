@@ -2,9 +2,10 @@ import logging
 from typing import Final
 
 from dishka import AsyncContainer
+from dishka_faststream import setup_dishka
 from faststream.rabbit import RabbitBroker
 
-from goldy.infrastructure.task_manager.consumers import setup_order_event_consumers
+from goldy.infrastructure.task_manager.consumers import order_events
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -15,14 +16,17 @@ def setup_notification_consumers(
 ) -> None:
     """Attaches the order-event subscribers to the worker's FastStream broker.
 
-    Called after the container is built and before the broker is started: a
-    subscriber registered after ``start`` is never consumed from, and the
-    consumers need the container to open a request scope per message.
+    Two things, in this order: the dishka middleware, which opens a request
+    scope per message so a subscriber can ask for ``Sender`` the way a
+    Telegram handler does; then the router the subscribers are declared on.
+    Called after the container is built and before the broker is started — a
+    subscriber registered after ``start`` is never consumed from.
 
     Lives in bootstrap rather than in the entry point for the reason
     ``seed_admins`` does — ``setup`` is one of the few packages allowed to
     reach into ``application`` and ``infrastructure``, and the entry point
     stays an orchestration script.
     """
-    setup_order_event_consumers(broker, container)
+    setup_dishka(container, broker=broker)
+    broker.include_router(order_events)
     logger.debug("notifications: consumers attached to the event broker")

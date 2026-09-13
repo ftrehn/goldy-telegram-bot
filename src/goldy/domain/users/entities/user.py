@@ -25,6 +25,7 @@ from goldy.domain.users.events import (
     UserUnblocked,
 )
 from goldy.domain.users.registration import Registration
+from goldy.domain.users.services.authorization.role_hierarchy import STAFF_ROLES
 from goldy.domain.users.values.block_reason import BlockReason
 from goldy.domain.users.values.external_account_id import ExternalAccountId
 from goldy.domain.users.values.full_name import FullName
@@ -39,8 +40,6 @@ from goldy.domain.users.values.user_status import UserStatus
 if TYPE_CHECKING:
     from goldy.domain.common.event import Event
     from goldy.domain.common.events_collection import EventsCollection
-
-_STAFF_ROLES: frozenset[UserRole] = frozenset({UserRole.MANAGER, UserRole.ADMIN})
 
 
 @final
@@ -344,7 +343,7 @@ class User(Aggregate[UserId]):
     @property
     def is_staff(self) -> bool:
         """Whether this person may reach the admin side at all."""
-        return self.role in _STAFF_ROLES
+        return self.role in STAFF_ROLES
 
     def account_for(self, platform: MessengerPlatform) -> MessengerAccount | None:
         return next(

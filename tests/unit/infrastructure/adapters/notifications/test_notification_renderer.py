@@ -4,8 +4,8 @@ The lesson this project already paid for: a Fluent placeholder whose argument
 was not passed does not appear as ``{ $number }`` in the message. It makes the
 render fail, so the customer gets nothing at all and the only trace is a line
 in a worker log. Reading the ``.ftl`` files and nodding is therefore not a
-check — every key here is rendered with exactly the arguments its handler
-builds, in both languages.
+check — every notification the handlers can build is rendered here, in both
+languages, with every field it carries looked for in the text.
 
 The second failure this guards is the quieter one: a message added to ``ru``
 and forgotten in ``en``. The bot's locales are held to the same rule, and half
@@ -13,15 +13,22 @@ the customers silently losing their notifications is a worse outcome than a
 failing test.
 """
 
-from collections.abc import Mapping
+from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Final
 
 import pytest
 
-from goldy.application.commands.notifications import text_keys
-from goldy.application.common.ports.notifications import NotificationText
+from goldy.application.common.ports.notifications import (
+    Notification,
+    OrderDeliveryAddressChangedNotification,
+    OrderPlacedNotification,
+    OrderStatusChangedNotification,
+)
+from goldy.application.common.views.money import MoneyView
 from goldy.domain.users.values.locale import SUPPORTED_LOCALES
+from goldy.infrastructure.adapters.notifications import text_keys
 from goldy.infrastructure.adapters.notifications.fluent_notification_renderer import (
     LC_MESSAGES,
     FluentNotificationRenderer,
@@ -32,38 +39,39 @@ from goldy.infrastructure.adapters.notifications.notification_locales_path impor
 )
 from goldy.infrastructure.errors import NotificationRenderError
 
-MESSAGE_ARGUMENTS: Final[Mapping[str, Mapping[str, str | int]]] = {
-    text_keys.NOTIFICATION_ORDER_PLACED: {
-        "number": "1042",
-        "customer": "Иван Иванов",
-        "phone": "+79991234567",
-        "address": "Москва, Ленина 1",
-        "lines": 3,
-        "total": "1234.00 RUB",
-    },
-    text_keys.NOTIFICATION_ORDER_STATUS_CHANGED: {
-        "number": "1042",
-        "status": "shipped",
-    },
-    text_keys.NOTIFICATION_ORDER_STATUS_CHANGED_REASON: {
-        "number": "1042",
-        "status": "cancelled",
-        "reason": "Товара нет на складе",
-    },
-    text_keys.NOTIFICATION_ORDER_ADDRESS_CHANGED: {
-        "number": "1042",
-        "old_address": "Москва, Ленина 1",
-        "new_address": "Санкт-Петербург, Невский 20",
-    },
-}
-"""The arguments each handler actually passes, restated once.
+NOTIFICATIONS: Final[tuple[Notification, ...]] = (
+    OrderPlacedNotification(
+        number="240913-3K7QXA",
+        customer_name="Иван Иванов",
+        phone_number="+79991234567",
+        address="Москва, Ленина 1",
+        line_count=3,
+        total=MoneyView(amount=Decimal("1234.00"), currency="RUB"),
+    ),
+    OrderStatusChangedNotification(number="240913-3K7QXA", status="shipped"),
+    OrderStatusChangedNotification(
+        number="240913-3K7QXA",
+        status="cancelled",
+        reason="Товара нет на складе",
+    ),
+    OrderDeliveryAddressChangedNotification(
+        number="240913-3K7QXA",
+        old_address="Москва, Ленина 1",
+        new_address="Санкт-Петербург, Невский 20",
+    ),
+)
+"""One of every kind of notification a handler can build, fully filled in.
 
-Restated rather than imported, deliberately. A test that built the arguments by
-calling the handler would pass whatever the handler happened to send, including
-nothing; this table is the contract the ``.ftl`` files are held to.
+The two status changes are both here on purpose: with and without a reason
+are two messages in the files, and the renderer chooses between them.
 """
 
 LOCALES: Final[tuple[str, ...]] = tuple(sorted(SUPPORTED_LOCALES))
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class _UnknownNotification(Notification):
+    """A kind nobody wrote a wording for."""
 
 
 @pytest.fixture(scope="session")
@@ -71,11 +79,11 @@ def renderer() -> FluentNotificationRenderer:
     return FluentNotificationRenderer(NOTIFICATION_LOCALES_PATH)
 
 
-def test_the_registry_covers_every_message_the_handlers_send() -> None:
-    """The table above and the key registry are the same set.
+def test_every_declared_key_is_written_in_the_files() -> None:
+    """A key declared and never written is a message nobody will ever receive.
 
-    Adding a key and forgetting to render it here would leave exactly the kind
-    of message this module exists to catch untested.
+    A subset rather than equality: the files also hold helper messages the
+    others reference — the status wording — which no handler asks for by name.
     """
     declared = {
         value
@@ -83,25 +91,23 @@ def test_the_registry_covers_every_message_the_handlers_send() -> None:
         if name.isupper() and isinstance(value, str)
     }
 
-    assert declared == set(MESSAGE_ARGUMENTS)
+    assert declared <= _message_ids("ru")
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-@pytest.mark.parametrize("key", sorted(MESSAGE_ARGUMENTS))
-def test_every_message_renders_in_every_language(
+@pytest.mark.parametrize("notification", NOTIFICATIONS, ids=type)
+def test_every_notification_renders_in_every_language(
     renderer: FluentNotificationRenderer,
-    key: str,
+    notification: Notification,
     locale: str,
 ) -> None:
-    rendered = renderer.render(
-        NotificationText(key=key, args=MESSAGE_ARGUMENTS[key]), locale
-    )
+    rendered = renderer.render(notification, locale)
 
     assert rendered.strip()
 
 
 @pytest.mark.parametrize("locale", LOCALES)
-def test_every_argument_reaches_the_message(
+def test_every_field_of_a_placed_order_reaches_the_message(
     renderer: FluentNotificationRenderer,
     locale: str,
 ) -> None:
@@ -110,14 +116,30 @@ def test_every_argument_reaches_the_message(
     Fluent is loud about an argument that is missing and silent about one that
     is never used, so the second direction has to be checked here.
     """
-    key = text_keys.NOTIFICATION_ORDER_PLACED
-    rendered = renderer.render(
-        NotificationText(key=key, args=MESSAGE_ARGUMENTS[key]),
-        locale,
-    )
+    placed = NOTIFICATIONS[0]
+    assert isinstance(placed, OrderPlacedNotification)
 
-    for value in MESSAGE_ARGUMENTS[key].values():
-        assert str(value) in rendered
+    rendered = renderer.render(placed, locale)
+
+    for value in (
+        placed.number,
+        placed.customer_name,
+        placed.phone_number,
+        placed.address,
+        str(placed.line_count),
+        "1234.00 RUB",
+    ):
+        assert value in rendered
+
+
+def test_a_cancellation_reason_is_printed_and_its_absence_is_not(
+    renderer: FluentNotificationRenderer,
+) -> None:
+    with_reason = renderer.render(NOTIFICATIONS[2], "ru")
+    without_reason = renderer.render(NOTIFICATIONS[1], "ru")
+
+    assert "Товара нет на складе" in with_reason
+    assert "Причина" not in without_reason
 
 
 def test_both_languages_define_exactly_the_same_messages() -> None:
@@ -135,38 +157,17 @@ def test_an_unknown_language_falls_back_rather_than_failing(
     renderer: FluentNotificationRenderer,
 ) -> None:
     """A record written by a newer replica must not cost somebody their message."""
-    key = text_keys.NOTIFICATION_ORDER_STATUS_CHANGED
+    rendered = renderer.render(NOTIFICATIONS[1], "de")
 
-    rendered = renderer.render(
-        NotificationText(key=key, args=MESSAGE_ARGUMENTS[key]),
-        "de",
-    )
-
-    assert "1042" in rendered
+    assert "240913-3K7QXA" in rendered
 
 
-def test_a_forgotten_argument_raises_instead_of_printing_itself(
+def test_a_notification_nobody_wrote_a_wording_for_raises(
     renderer: FluentNotificationRenderer,
 ) -> None:
-    """The finding this whole module is built around, pinned down.
-
-    ``{ $status }`` with no ``status`` passed does not render as text — Fluent
-    reports an error and the renderer turns it into a refusal, which is why
-    every message above is rendered rather than eyeballed.
-    """
+    """A fact that happened and a customer never told is the failure to refuse."""
     with pytest.raises(NotificationRenderError):
-        renderer.render(
-            NotificationText(
-                key=text_keys.NOTIFICATION_ORDER_STATUS_CHANGED,
-                args={"number": "1042"},
-            ),
-            "ru",
-        )
-
-
-def test_a_message_nobody_wrote_raises(renderer: FluentNotificationRenderer) -> None:
-    with pytest.raises(NotificationRenderError):
-        renderer.render(NotificationText(key="notification-nothing"), "ru")
+        renderer.render(_UnknownNotification(), "ru")
 
 
 def test_a_locale_without_a_file_is_refused_at_startup(tmp_path: Path) -> None:
@@ -190,5 +191,5 @@ def _message_ids(locale: str) -> set[str]:
     return {
         line.split("=", 1)[0].strip()
         for line in resource.read_text(encoding="utf-8").splitlines()
-        if "=" in line and not line.startswith((" ", "#", "*", "["))
+        if line and not line.startswith(("#", " ")) and "=" in line
     }

@@ -70,6 +70,39 @@ class CartNotFoundError(ApplicationError):
     """
 
 
+class CartAlreadyExistsError(ApplicationError):
+    """Raised when a cart is inserted for somebody who already has one.
+
+    Comes from the unique index on ``carts.user_id`` rather than from a prior
+    read, for the reason ``UserAlreadyExistsError`` does: two simultaneous
+    first additions both find nothing and both insert. ``CartProvider`` is
+    the one caller, and it answers by taking the cart that won.
+    """
+
+
+class NotificationUndeliverableError(ApplicationError):
+    """Raised when a messenger account cannot be written to, now or later.
+
+    The person blocked the bot, deleted their account, or the chat no longer
+    exists — answers a messenger gives that do not change on a retry. A sender
+    raises this instead of pretending; the dispatcher catches it, counts the
+    recipient as skipped and carries on to the next one, because a batch of
+    managers must not be abandoned over one of them and a broker redelivery
+    would write to everyone the batch already reached a second time.
+    """
+
+
+class NotificationChannelUnavailableError(ApplicationError):
+    """Raised when nobody in this process can write to a recipient's messenger.
+
+    A person's notification target names a platform, and the worker holds one
+    sender per platform it is configured for. A target this build has no
+    sender for is a deployment that lets people choose a messenger nobody can
+    write to — a misconfiguration, not an ordinary absence, so the message is
+    refused loudly and the broker keeps it until the sender is deployed.
+    """
+
+
 class CartRepricedError(ApplicationError):
     """Raised when the cart is no longer worth what the confirmation screen said.
 

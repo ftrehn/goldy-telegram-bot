@@ -26,12 +26,12 @@ class ListCategoriesHandler(QueryHandler[ListCategoriesQuery, CategoryListView])
 
     @override
     async def handle(self, query: ListCategoriesQuery) -> CategoryListView:
-        parent_id = None if query.parent_id is None else CategoryId(value=query.parent_id)
-        parent = (
-            None
-            if parent_id is None
-            else await self._catalog_query_gateway.read_category(parent_id)
-        )
-        categories = await self._catalog_query_gateway.read_categories(parent_id)
+        if query.parent_id is None:
+            roots = await self._catalog_query_gateway.read_root_categories()
+            return CategoryListView(parent=None, categories=roots)
 
-        return CategoryListView(parent=parent, categories=tuple(categories))
+        parent_id = CategoryId(value=query.parent_id)
+        parent = await self._catalog_query_gateway.read_category(parent_id)
+        subgroups = await self._catalog_query_gateway.read_subcategories(parent_id)
+
+        return CategoryListView(parent=parent, categories=subgroups)

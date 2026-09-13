@@ -24,6 +24,7 @@ from goldy.presentation.telegram.handlers.checkout.callbacks import (
 )
 from goldy.presentation.telegram.handlers.checkout.getters import (
     address_getter,
+    comment_getter,
     confirm_getter,
     done_getter,
     phone_getter,
@@ -79,7 +80,10 @@ CHECKOUT_DIALOG: Final[Dialog] = Dialog(
         getter=phone_getter,
     ),
     Window(
-        I18NFormat(text_keys.CHECKOUT_COMMENT_PROMPT),
+        I18NFormat(
+            text_keys.CHECKOUT_COMMENT_PROMPT,
+            max_length=Format("{max_length}"),
+        ),
         MessageInput(on_comment_typed, content_types=[ContentType.TEXT]),
         Button(
             I18NFormat(text_keys.CHECKOUT_SKIP_BUTTON),
@@ -92,6 +96,7 @@ CHECKOUT_DIALOG: Final[Dialog] = Dialog(
             state=CheckoutStates.PHONE,
         ),
         state=CheckoutStates.COMMENT,
+        getter=comment_getter,
     ),
     Window(
         I18NFormat(text_keys.CHECKOUT_REPRICED_NOTICE, when="repriced"),

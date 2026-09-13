@@ -24,7 +24,11 @@ from goldy.application.commands.notifications.notify_order_placed.handler import
 from goldy.application.commands.notifications.notify_order_status.handler import (
     NotifyOrderStatusChangedHandler,
 )
+from goldy.application.commands.notifications.senders import NotificationSenders
 from goldy.application.common.ports.notifications import NotificationRenderer
+from goldy.application.common.services.notification_recipient_resolver import (
+    NotificationRecipientResolver,
+)
 from goldy.application.common.views.user import MessengerAccountView, UserView
 from goldy.domain.users.values.locale import DEFAULT_LOCALE
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
@@ -90,7 +94,12 @@ def dispatcher(
     sender: RecordingNotificationSender,
     renderer: NotificationRenderer,
 ) -> NotificationDispatcher:
-    return NotificationDispatcher(sender, renderer)
+    """One Telegram sender in the registry, the way the worker is deployed today."""
+    return NotificationDispatcher(
+        NotificationSenders([sender]),
+        renderer,
+        NotificationRecipientResolver(),
+    )
 
 
 @pytest.fixture()

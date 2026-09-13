@@ -3,7 +3,7 @@ from typing import Final, override
 from goldy.application.common.mediator.handlers import QueryHandler
 from goldy.application.common.ports.carts import CartQueryGateway
 from goldy.application.common.ports.identity_provider import IdentityProvider
-from goldy.application.common.services.price_type_provider import PriceTypeProvider
+from goldy.application.common.services.price_type_resolver import PriceTypeResolver
 from goldy.application.common.views.cart import CartView
 from goldy.application.common.views.money import MoneyView
 from goldy.application.queries.carts.get_cart.query import GetCartQuery
@@ -28,17 +28,17 @@ class GetCartHandler(QueryHandler[GetCartQuery, CartView]):
     def __init__(
         self,
         identity_provider: IdentityProvider,
-        price_type_provider: PriceTypeProvider,
+        price_type_resolver: PriceTypeResolver,
         cart_query_gateway: CartQueryGateway,
     ) -> None:
         self._identity_provider: Final[IdentityProvider] = identity_provider
-        self._price_type_provider: Final[PriceTypeProvider] = price_type_provider
+        self._price_type_resolver: Final[PriceTypeResolver] = price_type_resolver
         self._cart_query_gateway: Final[CartQueryGateway] = cart_query_gateway
 
     @override
     async def handle(self, query: GetCartQuery) -> CartView:
         user_id = await self._identity_provider.get_current_user_id()
-        price_type_id = await self._price_type_provider.current()
+        price_type_id = await self._price_type_resolver.resolve_for(user_id)
 
         view = await self._cart_query_gateway.read_for(user_id, price_type_id)
 

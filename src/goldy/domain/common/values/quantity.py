@@ -7,7 +7,7 @@ from goldy.domain.common.values.errors import (
     QuantityLimitExceededError,
 )
 
-MAX_QUANTITY: Final[int] = 10000
+MAX_QUANTITY: Final[int] = 1_000_000
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -24,9 +24,13 @@ class Quantity(ValueObject):
     ``remove_item``, not a quantity of nothing: a line that means "none of
     this" is a line every reader downstream has to remember to skip.
 
-    The ceiling is ten thousand rather than a thousand because a shop with
-    price types is a wholesale shop: a thousand pieces of ordinary fastenings
-    is reached on the first real order.
+    The ceiling is a million pieces, and it is a guard against a slipped
+    finger rather than a statement about the assortment. A shop with price
+    types is a wholesale shop: a thousand pieces of ordinary fastenings is
+    reached on the first real order, and two hundred thousand tiles for one
+    site is a large order, not an impossible one. What the ceiling refuses is
+    a number that cannot be an order at all, and ``Money`` still fits the
+    total of a million pieces at the dearest price it allows.
     """
 
     value: int

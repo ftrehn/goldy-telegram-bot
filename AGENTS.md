@@ -76,7 +76,7 @@ domain/
     errors.py      no entities and no aggregate — see below
   carts/
     entities/      Cart (aggregate), CartLine
-    values/, factories/, ports/, errors.py
+    values/, factories/, ports/, errors.py, events.py
   orders/
     entities/      Order (aggregate), OrderLine
     values/, ports/, errors.py, events.py
@@ -146,7 +146,9 @@ target.block(reason)
 `SUBORDINATE_ROLES` is the single source of truth for who may act on whom. Two
 rules fall out of it for free, because nobody is their own subordinate: an
 administrator cannot touch another administrator, and nobody can block
-themselves. Do not re-state either as a separate check.
+themselves. Do not re-state either as a separate check. `STAFF_ROLES` beside
+it is the one statement of who works the shop — `User.is_staff`, the staff
+filter and the worker's "who hears about a new order" all read it.
 
 `ADMIN` appears in no one's subordinate set, so **the role cannot be granted
 through the bot at all**. The first administrators come from
@@ -162,7 +164,8 @@ application/
   common/
     mediator/      RequestHandler, PipelineHandler, markers, Sender
     ports/         every interface the infrastructure implements
-    services/      UserProvider
+    services/      UserProvider, CartProvider, PriceTypeResolver,
+                   CartPricingService, NotificationRecipientResolver
     views/         read models returned to presentation
     query_params/  Pagination, SortingOrder, UserFilters
   pipelines/       TransactionPipeline, EventsPipeline
@@ -180,13 +183,25 @@ Handlers:
 Gateways, not repositories. `UserCommandGateway` hands back whole aggregates;
 `UserQueryGateway` returns views and never aggregates. The query gateway is a
 DAO and a `Protocol` on purpose — a caching decorator over it is invisible to
-every handler.
+every handler. The name says the shape: a *gateway* is thin — read, add — and
+hands aggregates in and out; a port that takes batches, upserts conditionally
+and sweeps is a *DAO* (`CatalogProjectionDao`); a port that reads with the
+intent to write into an order is a *reader* returning domain values
+(`PricingReader`), never views.
 
-Two rules **cannot** be enforced in the domain: that a phone number belongs to
-one user, and that a messenger account does too. Both span aggregates and any
-check-by-reading loses to a concurrent registration. Unique indexes hold them,
-`SqlAlchemyUserCommandGateway.add` flushes so the clash surfaces as
-`UserAlreadyExistsError`, and the caller retries once.
+Whether a person who has no cart gets one is an application decision, not a
+storage one: `CartProvider.current_or_new()` reads, creates through the
+factory and adds, and answers a lost race by reading the cart that won. The
+gateway only reports the clash. The price list is resolved the same visible
+way — `PriceTypeResolver.resolve_for(user_id)` with the id the handler took
+from `IdentityProvider`; there is no hidden context a price comes from.
+
+Three rules **cannot** be enforced in the domain: that a phone number belongs
+to one user, that a messenger account does too, and that a person has one
+cart. All span aggregates and any check-by-reading loses to a concurrent
+request. Unique indexes hold them, the command gateways flush so the clash
+surfaces as `UserAlreadyExistsError` or `CartAlreadyExistsError`, and the
+caller decides — a retry for registration, the winner's cart for a cart.
 
 ## Pipelines and the mediator
 
@@ -214,16 +229,31 @@ to the outbox table **in the same transaction**. The scheduler fires
 
 Delivery is at-least-once, so consumers must be idempotent — they key off
 `OutboxMessage.id`, which is stable across retries. That key is enforced by the
-`inbox_messages` table: `InboxGateway.claim` is one
-`INSERT ... ON CONFLICT (id) DO NOTHING RETURNING id`, and the row commits in
-the same transaction as whatever the message caused. A handler that raises gives
-the claim back and the message is redelivered; a handler that decides there is
-nothing to do keeps it, because the answer will not be different next time.
+`inbox_messages` table: `InboxGateway.claim` is one plain `INSERT` inside a
+savepoint, refused by the primary key for a message seen before, and the row
+commits in the same transaction as whatever the message caused. A handler that
+raises gives the claim back and the message is redelivered; a handler that
+decides there is nothing to do keeps it, because the answer will not be
+different next time. The notification commands carry `event_type` for the
+claim, taken by the subscriber from the routing key the message arrived under.
 
 The consumer side lives in `infrastructure/task_manager/consumers/`, which
-`.importlinter` already allows to reach into `application.commands`. One durable
-queue per event, bound by routing key — the event's class name — so one poisoned
-message cannot hold up a different kind of message behind it.
+`.importlinter` already allows to reach into `application.commands`. They are
+ordinary FastStream subscribers on a `RabbitRouter`: the body is parsed into
+the event by its annotation, `Sender` arrives through `dishka_faststream`'s
+`FromDishka`, and a body that does not parse is logged and acknowledged by the
+router's `ExceptionMiddleware`. One durable queue per event, bound by routing
+key — the event's class name — so one poisoned message cannot hold up a
+different kind of message behind it.
+
+Notifications are typed. A handler builds an `OrderPlacedNotification` or one
+of its siblings from `application/common/ports/notifications/notification.py`;
+the Fluent adapter owns the message keys and turns the object into text. A
+sender raises `NotificationUndeliverableError` for an account closed to us and
+the dispatcher counts that person as skipped; a recipient on a messenger this
+worker has no sender for is `NotificationChannelUnavailableError`, loud on
+purpose, because it is a deployment that lets people choose a channel nobody
+serves.
 
 Events carry primitives, not value objects: they are serialised, and their
 `event_id` / `event_date` are stamped at construction because the outbox row is
@@ -240,8 +270,10 @@ keyed and ordered by them.
   both ends, which is why it **starts** the event broker rather than only
   connecting it: a subscriber registered on a merely connected broker never
   consumes anything.
-- **dishka** for DI, **aiogram** + **aiogram-dialog** for Telegram.
-- **adaptix** for aggregate → view mapping.
+- **dishka** for DI, **aiogram** + **aiogram-dialog** for Telegram,
+  **dishka-faststream** for the worker's subscribers.
+- **adaptix** for aggregate → view mapping and for reading the catalog
+  snapshot off a decoded JSON document (`AdaptixCatalogSnapshotMapper`).
 
 Value objects reach the database through `TypeDecorator`s in
 `persistence/models/types.py`. Multi-field value objects are a `composite`.
@@ -337,6 +369,14 @@ aiogram-dialog. Dialog getters take what they need from the middleware data as
 parameters — `user: UserView` works, because aiogram-dialog passes the update
 data in.
 
+Use the widgets the library has before writing one. Closing a dialog is
+`Cancel()`, not a callback that calls `manager.done()`. A paged list is a
+`StubScroll` holding the page plus `PrevPage`/`NextPage` bound to it, wired by
+`common/paging.py`; the getter reads the page through
+`manager.find(scroll_id).get_page()` and puts the page count under `pages`
+for the scroll to read. What is ours there is the arithmetic and the hiding of
+the buttons at the edges, nothing more.
+
 ## Testing rules (mandatory)
 
 - Tests mirror `src/` structure, under `unit/` and `integration/`.
@@ -378,6 +418,10 @@ Conventions this project insists on:
   explaining, explain it where the thing is defined.
 
 ```sh
+just bot               # the three processes and the seeder, with .env loaded
+just worker            # (just bot .env.dev.example for another file)
+just scheduler
+just seed docs/design/catalog-snapshot.example.json
 just lint              # ruff format + ruff check + codespell
 just mypy              # type check
 just static-analysis   # mypy + bandit + semgrep + import-linter

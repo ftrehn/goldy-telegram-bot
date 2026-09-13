@@ -2,12 +2,13 @@ from typing import Final, override
 
 from goldy.application.common.mediator.handlers import QueryHandler
 from goldy.application.common.ports.catalog import CatalogQueryGateway
+from goldy.application.common.ports.identity_provider import IdentityProvider
 from goldy.application.common.query_params.catalog_filters import (
     ProductFilters,
     ProductSorting,
 )
 from goldy.application.common.query_params.pagination import Pagination
-from goldy.application.common.services.price_type_provider import PriceTypeProvider
+from goldy.application.common.services.price_type_resolver import PriceTypeResolver
 from goldy.application.common.views.catalog import ProductListView
 from goldy.application.queries.catalog.list_products.query import ListProductsQuery
 from goldy.domain.catalog.values.category_id import CategoryId
@@ -28,15 +29,18 @@ class ListProductsHandler(QueryHandler[ListProductsQuery, ProductListView]):
 
     def __init__(
         self,
-        price_type_provider: PriceTypeProvider,
+        identity_provider: IdentityProvider,
+        price_type_resolver: PriceTypeResolver,
         catalog_query_gateway: CatalogQueryGateway,
     ) -> None:
-        self._price_type_provider: Final[PriceTypeProvider] = price_type_provider
+        self._identity_provider: Final[IdentityProvider] = identity_provider
+        self._price_type_resolver: Final[PriceTypeResolver] = price_type_resolver
         self._catalog_query_gateway: Final[CatalogQueryGateway] = catalog_query_gateway
 
     @override
     async def handle(self, query: ListProductsQuery) -> ProductListView:
-        price_type_id = await self._price_type_provider.current()
+        user_id = await self._identity_provider.get_current_user_id()
+        price_type_id = await self._price_type_resolver.resolve_for(user_id)
         filters = ProductFilters(
             category_id=(
                 None if query.category_id is None else CategoryId(value=query.category_id)

@@ -19,6 +19,8 @@ error-unknown = Something went wrong. We are looking into it.
 # That is not an AppError, so the error handler itself dies and the person gets
 # nothing at all instead of the refusal this message was written for.
 error-check-value = Please check what you entered — that value will not do.
+address-outside-russia = We deliver within Russia only — please write the address in Cyrillic.
+address-without-building = The address has no building number. Name the street and the building, or the courier has nowhere to go.
 cart-empty = Your cart is empty — add something before placing an order.
 cart-line-not-found = That line is no longer in your cart. Open the cart again.
 cart-full = There are too many lines in the cart. Remove some, or order in parts.

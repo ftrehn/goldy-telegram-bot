@@ -1,19 +1,21 @@
+import asyncio
 import logging
 from collections.abc import Iterable
 from typing import Final
 
 from goldy.application.commands.notifications.outcome import NotificationOutcome
-from goldy.application.commands.notifications.recipients import (
-    NotificationRecipient,
-    recipient_for,
-)
+from goldy.application.commands.notifications.senders import NotificationSenders
 from goldy.application.common.ports.notifications import (
+    Notification,
     NotificationRenderer,
-    NotificationSender,
-    NotificationText,
     OutgoingNotification,
 )
+from goldy.application.common.services.notification_recipient_resolver import (
+    NotificationRecipient,
+    NotificationRecipientResolver,
+)
 from goldy.application.common.views.user import UserView
+from goldy.application.error import NotificationUndeliverableError
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -21,73 +23,89 @@ logger: Final[logging.Logger] = logging.getLogger(__name__)
 class NotificationDispatcher:
     """Renders one notification per person, in their language, and sends it.
 
-    A collaborator shared by the notification handlers rather than two
-    collaborators injected into each. The pair is always used together — text
-    without a language is not a message, and a sender without text has nothing
-    to send — and every handler would otherwise repeat the same few lines,
-    including the check that keeps a Telegram sender away from a MAX account.
+    A collaborator shared by the notification handlers rather than three
+    collaborators injected into each. The trio is always used together —
+    whom to write to, what the words are in their language, and which sender
+    speaks their messenger — and every handler would otherwise repeat the
+    same few lines.
 
-    Nothing here raises because somebody could not be reached. A batch of
-    managers must not be abandoned when one of them has blocked the bot, and a
-    raised exception would send the broker message back for redelivery — which
-    would write to everyone the batch had already reached a second time.
+    Two failures are answers, and one is not. A person who cannot be reached
+    is counted as skipped and the batch goes on, because a batch of managers
+    must not be abandoned when one of them has blocked the bot, and a raised
+    exception would send the broker message back for redelivery — which would
+    write to everyone the batch had already reached a second time. A messenger
+    this process has no sender for is not an answer: it is a deployment that
+    let somebody choose a channel nobody serves, and it raises.
     """
 
     def __init__(
         self,
-        sender: NotificationSender,
+        senders: NotificationSenders,
         renderer: NotificationRenderer,
+        recipient_resolver: NotificationRecipientResolver,
     ) -> None:
-        self._sender: Final[NotificationSender] = sender
+        self._senders: Final[NotificationSenders] = senders
         self._renderer: Final[NotificationRenderer] = renderer
+        self._recipient_resolver: Final[NotificationRecipientResolver] = (
+            recipient_resolver
+        )
 
     async def dispatch_to_all(
         self,
         users: Iterable[UserView],
-        text: NotificationText,
+        notification: Notification,
     ) -> NotificationOutcome:
         """Writes the same notification to everyone it is meant for.
 
         The text is rendered per person rather than once: two managers can read
-        different languages, and the whole point of carrying a key this far is
-        that the wording is chosen by the reader.
+        different languages, and the whole point of carrying a typed message
+        this far is that the wording is chosen by the reader.
+
+        The sends go out together rather than one after another. They are
+        independent calls to a messenger, so three managers wait for one
+        round trip and not for three; they are still awaited, because the
+        handler's transaction — and with it the inbox claim — must not commit
+        before the messages have actually left.
         """
-        delivered = 0
-        skipped = 0
+        recipients = [self._recipient_resolver.resolve(user) for user in users]
+        deliveries = await asyncio.gather(
+            *(
+                self.dispatch(recipient, notification)
+                for recipient in recipients
+                if recipient is not None
+            ),
+        )
+        delivered = sum(1 for reached in deliveries if reached)
 
-        for user in users:
-            recipient = recipient_for(user)
-
-            if recipient is None or not await self.dispatch(recipient, text):
-                skipped += 1
-                continue
-
-            delivered += 1
-
-        return NotificationOutcome(delivered=delivered, skipped=skipped)
+        return NotificationOutcome(
+            delivered=delivered,
+            skipped=len(recipients) - delivered,
+        )
 
     async def dispatch(
         self,
         recipient: NotificationRecipient,
-        text: NotificationText,
+        notification: Notification,
     ) -> bool:
         """True when the message reached the account, False when it could not.
 
-        The platform check is the notification target being respected rather
-        than assumed: somebody who chose to be reached on MAX is not written to
-        on Telegram because their Telegram id happens to be on file.
+        Raises:
+            NotificationChannelUnavailableError: no sender in this process
+                speaks the recipient's messenger.
         """
-        if recipient.platform is not self._sender.platform:
+        sender = self._senders.for_platform(recipient.platform)
+        body = self._renderer.render(notification, recipient.locale)
+
+        try:
+            await sender.send(
+                OutgoingNotification(external_id=recipient.external_id, text=body),
+            )
+        except NotificationUndeliverableError:
             logger.info(
-                "notifications: %s wants %s, this sender speaks %s — skipping",
+                "notifications: %s cannot be reached on %s, skipping",
                 recipient.user_id,
                 recipient.platform.value,
-                self._sender.platform.value,
             )
             return False
 
-        body = self._renderer.render(text, recipient.locale)
-
-        return await self._sender.send(
-            OutgoingNotification(external_id=recipient.external_id, text=body),
-        )
+        return True

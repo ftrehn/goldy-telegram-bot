@@ -4,20 +4,20 @@ from typing import Final
 from aiogram.enums import ContentType
 from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.input import MessageInput
-from aiogram_dialog.widgets.kbd import Button, Group, Select, SwitchTo
+from aiogram_dialog.widgets.kbd import Button, Cancel, Group, Select, SwitchTo
 from aiogram_dialog.widgets.text import Format
 
 from goldy.presentation.telegram.common import text_keys
-from goldy.presentation.telegram.common.paging import paging_row
+from goldy.presentation.telegram.common.paging import paging_widgets
 from goldy.presentation.telegram.common.widgets import I18NFormat
 from goldy.presentation.telegram.handlers.orders.callbacks import (
     on_address_typed,
     on_cancel_confirmed,
-    on_close,
     on_dialog_start,
     on_order_selected,
 )
 from goldy.presentation.telegram.handlers.orders.getters import (
+    ORDERS_SCROLL_ID,
     order_card_getter,
     orders_getter,
 )
@@ -42,8 +42,8 @@ ORDERS_DIALOG: Final[Dialog] = Dialog(
             ),
             width=1,
         ),
-        paging_row(),
-        Button(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close", on_click=on_close),
+        *paging_widgets(ORDERS_SCROLL_ID),
+        Cancel(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close"),
         state=OrdersStates.LIST,
         getter=orders_getter,
     ),
@@ -93,7 +93,7 @@ ORDERS_DIALOG: Final[Dialog] = Dialog(
             id="back",
             state=OrdersStates.LIST,
         ),
-        Button(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close", on_click=on_close),
+        Cancel(I18NFormat(text_keys.COMMON_CLOSE_BUTTON), id="close"),
         state=OrdersStates.CARD,
         getter=order_card_getter,
     ),

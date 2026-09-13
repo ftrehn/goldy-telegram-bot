@@ -7,7 +7,6 @@ from goldy.domain.carts.factories.cart_factory import CartFactory
 from goldy.domain.carts.ports.id_generator import CartIdGenerator
 from goldy.domain.common.events_collection import EventsCollection
 from goldy.domain.orders.ports.id_generator import OrderIdGenerator
-from goldy.domain.orders.ports.number_generator import OrderNumberGenerator
 from goldy.domain.orders.services.checkout_service import CheckoutService
 from goldy.domain.users.factories.user_factory import UserFactory
 from goldy.domain.users.ports.id_generator import UserIdGenerator
@@ -20,9 +19,6 @@ from goldy.infrastructure.adapters.common.uuid7_order_id_generator import (
 )
 from goldy.infrastructure.adapters.common.uuid7_user_id_generator import (
     Uuid7UserIdGenerator,
-)
-from goldy.infrastructure.adapters.persistence.postgres_order_number_generator import (
-    PostgresOrderNumberGenerator,
 )
 
 
@@ -48,23 +44,15 @@ def domain_provider() -> Provider:
     day one of them stops resolving there, something aiogram-shaped has crept
     into the domain.
 
-    ``OrderNumberGenerator`` is the odd one: its adapter draws ``nextval`` from
-    a Postgres sequence and therefore asks for the session, which makes it look
-    like a gateway. It is bound here anyway, beside the two id generators,
-    because what the domain asked for is the same thing in all three cases -
-    somewhere for an identifier to come from - and splitting one of them out on
-    the strength of how its adapter is implemented would put the answer to "who
-    mints an order number" in a second file.
+    There is no order number generator to bind. The number is derived by
+    ``Order.place`` from the id and the clock, so the three generators here
+    are all of the same kind - a UUID minted locally, no session in sight.
     """
     provider: Final[Provider] = Provider(scope=Scope.REQUEST)
     provider.provide(make_events_collection, provides=EventsCollection)
     provider.provide(source=Uuid7UserIdGenerator, provides=UserIdGenerator)
     provider.provide(source=Uuid7CartIdGenerator, provides=CartIdGenerator)
     provider.provide(source=Uuid7OrderIdGenerator, provides=OrderIdGenerator)
-    provider.provide(
-        source=PostgresOrderNumberGenerator,
-        provides=OrderNumberGenerator,
-    )
     provider.provide(source=UserFactory)
     provider.provide(source=CartFactory)
     provider.provide(source=CheckoutService)

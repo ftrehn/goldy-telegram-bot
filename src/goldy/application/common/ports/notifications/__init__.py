@@ -1,11 +1,20 @@
 from .inbox_gateway import InboxGateway
-from .notification_renderer import NotificationRenderer, NotificationText
+from .notification import (
+    Notification,
+    OrderDeliveryAddressChangedNotification,
+    OrderPlacedNotification,
+    OrderStatusChangedNotification,
+)
+from .notification_renderer import NotificationRenderer
 from .notification_sender import NotificationSender, OutgoingNotification
 
 __all__ = [
     "InboxGateway",
+    "Notification",
     "NotificationRenderer",
     "NotificationSender",
-    "NotificationText",
+    "OrderDeliveryAddressChangedNotification",
+    "OrderPlacedNotification",
+    "OrderStatusChangedNotification",
     "OutgoingNotification",
 ]

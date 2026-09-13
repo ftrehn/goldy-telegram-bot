@@ -36,7 +36,7 @@ class CatalogQueryGateway(Protocol):
     A ``Protocol`` for exactly that reason: **these reads may be cached**, and a
     caching decorator over this port has to be invisible to every handler using
     it. Anything read with the intent to write belongs on
-    :class:`PricingGateway` instead, which must not be cached.
+    :class:`PricingReader` instead, which must not be cached.
 
     No access rules are consulted anywhere behind this port. There is no rule
     about who may see which product — the storefront is one storefront and only
@@ -45,11 +45,20 @@ class CatalogQueryGateway(Protocol):
     """
 
     @abstractmethod
-    async def read_categories(
-        self,
-        parent_id: CategoryId | None,
-    ) -> Sequence[CategoryView]:
-        """The immediate subgroups of a group, or the roots when given nothing.
+    async def read_root_categories(self) -> Sequence[CategoryView]:
+        """The groups at the top of the catalog.
+
+        A method of its own rather than ``read_subcategories(None)``: "the
+        roots" and "the children of nothing" are the same rows, but a
+        parameter that means one thing when present and another when absent
+        is how a caller ends up listing the whole top level by passing an id
+        it failed to resolve.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def read_subcategories(self, parent_id: CategoryId) -> Sequence[CategoryView]:
+        """The immediate subgroups of one group.
 
         Only one level: the category screen draws its subgroups as buttons and
         lists the products of the whole subtree underneath them.

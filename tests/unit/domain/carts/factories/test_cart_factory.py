@@ -15,10 +15,10 @@ def test_the_factory_hands_the_new_cart_the_generated_id(
     assert cart.user_id == make_user_id()
 
 
-def test_a_new_cart_starts_empty_and_announces_nothing(
+def test_a_new_cart_starts_empty_and_announces_itself(
     cart_factory: CartFactory,
 ) -> None:
     cart = cart_factory.create(make_user_id())
 
     assert cart.is_empty is True
-    assert emitted_event_names(cart.events_collection) == []
+    assert emitted_event_names(cart.events_collection) == ["CartCreated"]

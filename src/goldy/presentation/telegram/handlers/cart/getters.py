@@ -18,10 +18,13 @@ from goldy.presentation.telegram.common.formatting import (
     format_stock,
 )
 from goldy.presentation.telegram.common.paging import (
+    PAGES_KEY,
     page_request,
     paging_data,
     reset_paging,
 )
+
+CART_SCROLL_ID: Final[str] = "cart_scroll"
 
 PRODUCT_ID_KEY: Final[str] = "product_id"
 """Which position the line screen is about, picked on the main screen."""
@@ -90,11 +93,12 @@ async def cart_getter(
     over the page, because "checkout" has to answer for every line and not for
     the eight in view.
 
-    Only the two arrow flags are taken from the pager, and taking the whole of
-    what it produces would be a silent defect rather than a convenience: it
-    answers with a ``total`` meaning "how many rows there are", and on this
-    screen ``total`` is the money. Spread over this dictionary it would put the
-    number of lines where the title prints the sum.
+    Only the page count is taken from the pager — it is what the scroll reads —
+    and taking the whole of what it produces would be a silent defect rather
+    than a convenience: it answers with a ``total`` meaning "how many rows
+    there are", and on this screen ``total`` is the money. Spread over this
+    dictionary it would put the number of lines where the title prints the
+    sum.
 
     ``can_checkout`` withholds the button on two different faults, and each one
     gets a notice of its own rather than one hedged sentence. A product gone
@@ -107,8 +111,12 @@ async def cart_getter(
     fault would promise an order the handler then refuses.
     """
     cart = await sender.send(GetCartQuery())
-    limit, offset = _page_of(dialog_manager, cart.line_count)
-    paging = paging_data(dialog_manager, total=cart.line_count)
+    limit, offset = await _page_of(dialog_manager, cart.line_count)
+    paging = await paging_data(
+        dialog_manager,
+        scroll_id=CART_SCROLL_ID,
+        total=cart.line_count,
+    )
 
     lines = [
         line_arguments(i18n, position, line)
@@ -128,12 +136,11 @@ async def cart_getter(
         "can_checkout": not cart.is_empty
         and not cart.has_unavailable_lines
         and not cart.has_unpriced_lines,
-        "has_prev": paging["has_prev"],
-        "has_next": paging["has_next"],
+        PAGES_KEY: paging[PAGES_KEY],
     }
 
 
-def _page_of(manager: DialogManager, total: int) -> tuple[int, int]:
+async def _page_of(manager: DialogManager, total: int) -> tuple[int, int]:
     """Which slice to draw, never one that has fallen off the end.
 
     Emptying the last page is ordinary here in a way it is not in a catalog:
@@ -143,11 +150,11 @@ def _page_of(manager: DialogManager, total: int) -> tuple[int, int]:
     as the cart having been lost.
 
     """
-    limit, offset = page_request(manager)
+    limit, offset = await page_request(manager, scroll_id=CART_SCROLL_ID)
 
     if has_fallen_off(offset=offset, total=total):
-        reset_paging(manager)
-        limit, offset = page_request(manager)
+        await reset_paging(manager, scroll_id=CART_SCROLL_ID)
+        limit, offset = await page_request(manager, scroll_id=CART_SCROLL_ID)
 
     return limit, offset
 

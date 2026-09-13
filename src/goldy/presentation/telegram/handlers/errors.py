@@ -35,6 +35,8 @@ from goldy.domain.orders.errors import (
     CancellationReasonRequiredError,
     CustomerCannotCancelProcessedOrderError,
     EmptyOrderError,
+    ForeignDeliveryAddressError,
+    IncompleteDeliveryAddressError,
     OrderNotEditableError,
     OrderStatusTransitionError,
     UnpricedCartLineError,
@@ -95,6 +97,8 @@ ERROR_TEXTS: Final[Mapping[type[AppError], str]] = {
     CancellationReasonRequiredError: text_keys.ORDER_REASON_REQUIRED,
     OrderNotEditableError: text_keys.ORDER_NOT_EDITABLE,
     OrderNotFoundError: text_keys.ORDER_NOT_FOUND,
+    ForeignDeliveryAddressError: text_keys.ADDRESS_OUTSIDE_RUSSIA,
+    IncompleteDeliveryAddressError: text_keys.ADDRESS_WITHOUT_BUILDING,
     # The catalog and the search over it.
     ProductNotFoundError: text_keys.CATALOG_PRODUCT_GONE,
     PriceTypeNotConfiguredError: text_keys.CATALOG_PRICE_MISSING,

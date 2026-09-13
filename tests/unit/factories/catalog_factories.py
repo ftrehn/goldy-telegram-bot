@@ -21,15 +21,16 @@ from goldy.application.common.ports.catalog import (
     PriceTypeBindingRow,
     PriceTypeRow,
     ProductRow,
+    ResolvedPriceType,
     StockRow,
 )
 from goldy.application.common.views.catalog import (
     CategoryView,
-    PriceTypeView,
     ProductListItemView,
     ProductView,
 )
 from goldy.application.common.views.money import MoneyView
+from goldy.domain.catalog.values.price_type_id import PriceTypeId
 from goldy.domain.common.values.currency import Currency
 from tests.unit.factories.shop_factories import (
     PRICE_TYPE_ID,
@@ -118,12 +119,15 @@ def make_product_view(
     )
 
 
-def make_price_type_view(
+def make_resolved_price_type(
     price_type_id: str = PRICE_TYPE_ID,
     *,
     is_supported: bool = True,
-) -> PriceTypeView:
-    return PriceTypeView(price_type_id=price_type_id, is_supported=is_supported)
+) -> ResolvedPriceType:
+    return ResolvedPriceType(
+        price_type_id=PriceTypeId(value=price_type_id),
+        is_supported=is_supported,
+    )
 
 
 def make_category_row(index: int = 1, parent_index: int | None = None) -> CategoryRow:

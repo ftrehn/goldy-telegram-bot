@@ -7,9 +7,10 @@ they come back as the values they went in as.
 
 The other is "one cart per person". That rule spans two aggregates, so the
 domain cannot hold it and a read-before-write loses to a concurrent request:
-the unique index on ``carts.user_id`` is what actually holds it, and
-``ensure_for`` is written so that the loser of the race is told nothing went
-wrong rather than handed an error to retry.
+the unique index on ``carts.user_id`` is what actually holds it, the gateway
+reports the refused insert as ``CartAlreadyExistsError`` without poisoning the
+session, and ``CartProvider`` is written so that the loser of the race is
+handed the winner's cart rather than an error to retry.
 """
 
 import asyncio
@@ -19,9 +20,11 @@ from dishka import AsyncContainer, Scope
 
 from goldy.application.common.ports.carts import CartCommandGateway
 from goldy.application.common.ports.transaction_manager import TransactionManager
+from goldy.application.error import CartAlreadyExistsError
+from goldy.domain.carts.factories.cart_factory import CartFactory
 from goldy.domain.carts.values.cart_id import CartId
 from goldy.domain.users.values.user_id import UserId
-from tests.integration.arrange import UserSeeder
+from tests.integration.arrange import UserSeeder, cart_provider_for
 from tests.unit.factories.shop_factories import make_product_id, make_quantity
 
 pytestmark = [
@@ -39,7 +42,7 @@ async def test_a_cart_reads_back_with_the_lines_it_was_given(
     seeded = await seed_user()
 
     async with worker_container(scope=Scope.REQUEST) as writer:
-        cart = await (await writer.get(CartCommandGateway)).ensure_for(seeded.id)
+        cart = await (await cart_provider_for(writer, seeded.id)).current_or_new()
         cart.add_item(make_product_id(1), make_quantity(3))
         cart.add_item(make_product_id(2), make_quantity(7))
         await (await writer.get(TransactionManager)).commit()
@@ -63,7 +66,7 @@ async def test_a_line_removed_from_the_aggregate_leaves_the_table(
     seeded = await seed_user()
 
     async with worker_container(scope=Scope.REQUEST) as writer:
-        cart = await (await writer.get(CartCommandGateway)).ensure_for(seeded.id)
+        cart = await (await cart_provider_for(writer, seeded.id)).current_or_new()
         cart.add_item(make_product_id(1), make_quantity(3))
         cart.add_item(make_product_id(2), make_quantity(7))
         await (await writer.get(TransactionManager)).commit()
@@ -102,15 +105,43 @@ async def test_asking_twice_hands_back_the_same_cart(
     seeded = await seed_user()
 
     async with worker_container(scope=Scope.REQUEST) as first:
-        created = await (await first.get(CartCommandGateway)).ensure_for(seeded.id)
+        created = await (await cart_provider_for(first, seeded.id)).current_or_new()
         created_id = created.id
         await (await first.get(TransactionManager)).commit()
 
     async with worker_container(scope=Scope.REQUEST) as second:
-        again = await (await second.get(CartCommandGateway)).ensure_for(seeded.id)
+        again = await (await cart_provider_for(second, seeded.id)).current_or_new()
         await (await second.get(TransactionManager)).commit()
 
     assert again.id == created_id
+
+
+async def test_a_second_cart_for_the_same_person_is_refused_by_the_index(
+    seed_user: UserSeeder,
+    worker_container: AsyncContainer,
+) -> None:
+    """The gateway reports the clash and leaves the session usable afterwards.
+
+    The read that follows is the point: after a refused insert outside a
+    savepoint the session would be rollback-only, and the provider's next move
+    — reading the cart that won — would fail with ``PendingRollbackError``.
+    """
+    seeded = await seed_user()
+
+    async with worker_container(scope=Scope.REQUEST) as first:
+        await (await cart_provider_for(first, seeded.id)).current_or_new()
+        await (await first.get(TransactionManager)).commit()
+
+    async with worker_container(scope=Scope.REQUEST) as second:
+        gateway = await second.get(CartCommandGateway)
+        factory = await second.get(CartFactory)
+
+        with pytest.raises(CartAlreadyExistsError):
+            await gateway.add(factory.create(seeded.id))
+
+        survivor = await gateway.by_user_id(seeded.id)
+
+    assert survivor is not None
 
 
 async def test_two_simultaneous_first_additions_land_on_one_cart(
@@ -120,9 +151,8 @@ async def test_two_simultaneous_first_additions_land_on_one_cart(
     """The race the unique index exists for, run for real on two connections.
 
     Both requests find nothing and both insert. The loser must come back with
-    the winner's cart and no error at all: after an ``IntegrityError`` the
-    session is rollback-only, so a gateway that let one out would leave the
-    caller unable to retry anything inside the same request.
+    the winner's cart and no error at all, which is ``CartProvider``'s
+    decision over the gateway's savepoint.
     """
     seeded = await seed_user()
 
@@ -147,8 +177,7 @@ async def _ensure_cart(container: AsyncContainer, user_id: UserId) -> CartId:
     connection, which is the only way two inserts can meet in the database.
     """
     async with container(scope=Scope.REQUEST) as scope:
-        gateway: CartCommandGateway = await scope.get(CartCommandGateway)
         transaction: TransactionManager = await scope.get(TransactionManager)
-        cart = await gateway.ensure_for(user_id)
+        cart = await (await cart_provider_for(scope, user_id)).current_or_new()
         await transaction.commit()
-        return cart.id
+        return CartId(cart.id)

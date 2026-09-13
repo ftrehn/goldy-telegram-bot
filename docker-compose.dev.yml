@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: goldy
-      POSTGRES_PASSWORD: goldy
+      POSTGRES_PASSWORD: goldy # pragma: allowlist secret — a throwaway dev default
       POSTGRES_DB: goldy
       # Values the bot never sets and the tests rely on: the catalog search
       # normalises through translate() and to_tsvector('russian', ...), both of

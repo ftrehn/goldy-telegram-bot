@@ -67,12 +67,12 @@ async def on_last_address_chosen(
     what a keyboard holds is whatever was true when it was drawn, and this is
     the one field of an order that a courier acts on.
     """
-    last_address = await sender.send(GetLastDeliveryAddressQuery())
+    last = await sender.send(GetLastDeliveryAddressQuery())
 
-    if last_address is None:
+    if last.address is None:
         return
 
-    manager.dialog_data[ADDRESS_KEY] = last_address
+    manager.dialog_data[ADDRESS_KEY] = last.address
     await manager.switch_to(CheckoutStates.RECIPIENT)
 
 

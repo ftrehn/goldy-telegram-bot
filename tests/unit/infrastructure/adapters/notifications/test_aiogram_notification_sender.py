@@ -1,14 +1,15 @@
-"""Which answers from Telegram are failures and which are just answers.
+"""Which answers from Telegram mean "never" and which mean "not now".
 
 The distinction is the whole adapter. "Forbidden" and "chat not found" mean the
 same thing next time, so retrying costs a redelivery and gains nothing — they
-come back as False and the batch moves on. A timeout or a 5xx might well
-succeed on the next attempt, so they become an ``InfrastructureError`` and the
-message goes back on the queue.
+become ``NotificationUndeliverableError``, which the dispatcher counts as a
+skip and moves on from. A timeout or a 5xx might well succeed on the next
+attempt, so they become an ``InfrastructureError`` and the message goes back on
+the queue.
 
-Getting it the wrong way round is not a small bug either way. Raising on
-"forbidden" would announce one order to the same managers over and over;
-swallowing a timeout would lose the notification silently.
+Getting it the wrong way round is not a small bug either way. An infrastructure
+error on "forbidden" would announce one order to the same managers over and
+over; swallowing a timeout would lose the notification silently.
 """
 
 from typing import Final, cast, override
@@ -23,6 +24,7 @@ from aiogram.exceptions import (
 from aiogram.methods import SendMessage, TelegramMethod
 
 from goldy.application.common.ports.notifications import OutgoingNotification
+from goldy.application.error import NotificationUndeliverableError
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
 from goldy.infrastructure.adapters.notifications.aiogram_notification_sender import (
     AiogramNotificationSender,
@@ -76,12 +78,11 @@ def test_the_sender_speaks_for_telegram_and_says_so() -> None:
     assert AiogramNotificationSender(StubBot()).platform is MessengerPlatform.TELEGRAM
 
 
-async def test_a_delivered_message_is_reported_delivered() -> None:
+async def test_a_message_is_written_to_the_account_as_a_chat_id() -> None:
     bot = StubBot()
 
-    delivered = await AiogramNotificationSender(bot).send(a_notification())
+    await AiogramNotificationSender(bot).send(a_notification())
 
-    assert delivered
     assert [call.chat_id for call in bot.calls] == [int(CHAT_ID)]
 
 
@@ -123,10 +124,11 @@ def test_the_notifier_bot_has_no_default_parse_mode() -> None:
         ),
     ),
 )
-async def test_an_unreachable_account_is_reported_not_raised(refusal: Exception) -> None:
-    delivered = await AiogramNotificationSender(StubBot(refusal)).send(a_notification())
-
-    assert not delivered
+async def test_an_unreachable_account_is_undeliverable_not_retryable(
+    refusal: Exception,
+) -> None:
+    with pytest.raises(NotificationUndeliverableError):
+        await AiogramNotificationSender(StubBot(refusal)).send(a_notification())
 
 
 async def test_a_transport_failure_is_wrapped_and_raised() -> None:
@@ -139,7 +141,11 @@ async def test_a_transport_failure_is_wrapped_and_raised() -> None:
         await AiogramNotificationSender(StubBot(failure)).send(a_notification())
 
 
-async def test_an_account_id_that_is_not_a_chat_id_is_an_error() -> None:
-    """``ExternalAccountId`` is text because MAX's is; Telegram's is a number."""
-    with pytest.raises(NotificationSendError):
+async def test_an_account_id_that_is_not_a_chat_id_is_undeliverable() -> None:
+    """``ExternalAccountId`` is text because MAX's is; Telegram's is a number.
+
+    Stored data that is not a chat id will not become one on a retry, so this
+    is the "never" kind of failure and not the "not now" kind.
+    """
+    with pytest.raises(NotificationUndeliverableError):
         await AiogramNotificationSender(StubBot()).send(a_notification("not-a-number"))

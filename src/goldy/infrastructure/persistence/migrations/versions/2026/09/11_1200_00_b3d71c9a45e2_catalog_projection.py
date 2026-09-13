@@ -72,7 +72,7 @@ def upgrade() -> None:
     op.create_table(
         "catalog_products",
         sa.Column("id", sa.String(length=128), nullable=False),
-        sa.Column("sku", sa.String(length=64), nullable=True),
+        sa.Column("sku", sa.String(length=64), nullable=False),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("full_name", sa.Text(), nullable=True),
         sa.Column("category_id", sa.String(length=128), nullable=True),

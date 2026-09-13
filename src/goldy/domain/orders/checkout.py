@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import final
 
@@ -21,7 +22,7 @@ class Checkout:
     """
 
     cart: Cart
-    priced_products: tuple[PricedProduct, ...]
+    priced_products: Sequence[PricedProduct]
     delivery_address: DeliveryAddress
     recipient: Recipient
     comment: OrderComment | None

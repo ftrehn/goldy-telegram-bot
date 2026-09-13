@@ -105,11 +105,3 @@ async def on_cancel_confirmed(
 
     await callback.answer(i18n.get(text_keys.ORDER_CANCELLED_TOAST))
     await manager.switch_to(OrdersStates.CARD)
-
-
-async def on_close(
-    _callback: CallbackQuery,
-    _widget: Button,
-    manager: DialogManager,
-) -> None:
-    await manager.done()

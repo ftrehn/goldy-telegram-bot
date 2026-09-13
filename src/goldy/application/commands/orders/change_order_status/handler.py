@@ -3,20 +3,17 @@ from typing import Final, override
 from goldy.application.commands.orders.change_order_status.command import (
     ChangeOrderStatusCommand,
 )
+from goldy.application.commands.orders.change_order_status.moves import MOVES
 from goldy.application.common.mediator.handlers import CommandHandler
 from goldy.application.common.ports.orders import OrderCommandGateway
 from goldy.application.common.services.user_provider import UserProvider
 from goldy.application.error import OrderNotFoundError
-from goldy.domain.orders.entities.order import Order
 from goldy.domain.orders.errors import OrderStatusTransitionError
 from goldy.domain.orders.services.authorization.permission import (
     CanManageOrders,
     OrderAccessContext,
 )
-from goldy.domain.orders.values.cancellation_initiator import CancellationInitiator
-from goldy.domain.orders.values.cancellation_reason import CancellationReason
 from goldy.domain.orders.values.order_id import OrderId
-from goldy.domain.orders.values.order_status import OrderStatus
 from goldy.domain.users.services.access_service import AccessService
 
 
@@ -27,6 +24,12 @@ class ChangeOrderStatusHandler(CommandHandler[ChangeOrderStatusCommand, None]):
     staff but delegates to ``IsStaff``. The rules about the move itself are the
     aggregate's: which transitions exist, that a cancellation by staff needs a
     reason, that a finished order moves nowhere.
+
+    Which aggregate method a status maps to is not decided here either. It is
+    a strategy looked up in ``MOVES``, one object per target status, so adding
+    a status is a new strategy and a new table entry rather than a new branch
+    in this method. A status with no strategy — ``NEW`` — is a move the table
+    of transitions does not know, and is refused as one.
 
     A manager may cancel a dispatched order, and that is deliberate — a courier
     brings a parcel back, which is a real thing that happens. The customer may
@@ -69,39 +72,10 @@ class ChangeOrderStatusHandler(CommandHandler[ChangeOrderStatusCommand, None]):
             ),
         )
 
-        self._move(order, command)
+        move = MOVES.get(command.status)
 
-    def _move(self, order: Order, command: ChangeOrderStatusCommand) -> None:
-        """Calls the aggregate method that names the move.
+        if move is None:
+            msg = f"Order '{order.number}' cannot be moved to {command.status.value}."
+            raise OrderStatusTransitionError(msg)
 
-        A match over the target rather than a generic "set the status": each
-        transition is a method on the aggregate with its own preconditions and
-        its own event, and a setter would route around all of them.
-
-        ``NEW`` appears in the match because the enum has five members and is
-        refused because nothing in ``ALLOWED_ORDER_TRANSITIONS`` leads back to
-        it — an order cannot be un-confirmed.
-
-        Raises:
-            OrderStatusTransitionError: the move is not in the table.
-            CancellationReasonRequiredError: staff cancelled without a reason.
-        """
-        match command.status:
-            case OrderStatus.CONFIRMED:
-                order.confirm()
-            case OrderStatus.SHIPPED:
-                order.ship()
-            case OrderStatus.COMPLETED:
-                order.complete()
-            case OrderStatus.CANCELLED:
-                order.cancel(
-                    initiated_by=CancellationInitiator.MANAGER,
-                    reason=(
-                        None
-                        if command.reason is None
-                        else CancellationReason(value=command.reason)
-                    ),
-                )
-            case OrderStatus.NEW:
-                msg = f"Order '{order.number}' cannot be moved back to new."
-                raise OrderStatusTransitionError(msg)
+        move.apply(order, actor=subject, reason=command.reason)

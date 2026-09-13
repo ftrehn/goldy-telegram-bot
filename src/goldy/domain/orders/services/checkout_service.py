@@ -9,7 +9,6 @@ from goldy.domain.orders.entities.order_line import OrderLine
 from goldy.domain.orders.errors import UnpricedCartLineError
 from goldy.domain.orders.placement import Placement
 from goldy.domain.orders.ports.id_generator import OrderIdGenerator
-from goldy.domain.orders.ports.number_generator import OrderNumberGenerator
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -26,16 +25,16 @@ class CheckoutService(BaseDomainService):
     """Turns a cart into an order, in one operation.
 
     A domain service because the aggregate is missing two different things at
-    once: the generators that mint an id and a number, and the second aggregate
-    the operation ends on. Emptying the cart belongs here rather than in a
-    handler — "the cart became an order" is a single business operation, and the
-    half of it left behind in a handler one day hands the customer an order with
+    once: the generator that mints an id, and the second aggregate the
+    operation ends on. Emptying the cart belongs here rather than in a handler
+    — "the cart became an order" is a single business operation, and the half
+    of it left behind in a handler one day hands the customer an order with
     the same cart still sitting on top of it.
 
-    ``checkout`` is asynchronous, which no other domain service in this project
-    is. ``OrderNumberGenerator`` has to ask a database sequence for the next
-    number, and that is I/O. The alternative is moving the number out of the
-    domain, which splits placing an order across two layers.
+    Synchronous, like every other domain service. The order number used to be
+    the one thing that needed I/O here, drawn from a database sequence; it is
+    now derived by ``Order.place`` from the id and the clock, so nothing in
+    this layer waits on anything.
 
     Stock is not consulted. What the bot holds is a stale projection of 1C with
     no reservation behind it, so refusing an order on it would turn away orders
@@ -48,13 +47,11 @@ class CheckoutService(BaseDomainService):
         self,
         events_collection: EventsCollection,
         order_id_generator: OrderIdGenerator,
-        order_number_generator: OrderNumberGenerator,
     ) -> None:
         self._events_collection: Final[EventsCollection] = events_collection
         self._order_id_generator: Final[OrderIdGenerator] = order_id_generator
-        self._order_number_generator: Final[OrderNumberGenerator] = order_number_generator
 
-    async def checkout(self, checkout: Checkout) -> Order:
+    def checkout(self, checkout: Checkout) -> Order:
         """Prices the cart into snapshot lines, places the order, empties the cart.
 
         Every line is built before anything is minted or emptied, so a cart the
@@ -81,7 +78,6 @@ class CheckoutService(BaseDomainService):
 
         order = Order.place(
             order_id=self._order_id_generator(),
-            order_number=await self._order_number_generator(),
             events_collection=self._events_collection,
             placement=Placement(
                 customer_id=cart.user_id,

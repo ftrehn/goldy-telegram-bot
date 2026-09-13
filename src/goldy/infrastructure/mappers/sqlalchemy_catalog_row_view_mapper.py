@@ -4,8 +4,6 @@ from sqlalchemy import RowMapping
 
 from goldy.application.common.views.catalog import (
     CategoryView,
-    PriceTypeView,
-    PricedProductView,
     ProductListItemView,
     ProductView,
 )
@@ -65,24 +63,6 @@ class SqlAlchemyCatalogRowViewMapper(CatalogRowViewMapper):
             unit_price=_to_money_view(row),
             stock=row["stock"],
             is_active=row["is_active"],
-        )
-
-    @override
-    def to_priced_product_view(self, row: RowMapping) -> PricedProductView:
-        return PricedProductView(
-            product_id=row["product_id"],
-            sku=row["sku"],
-            name=row["name"],
-            unit_id=row["unit_id"],
-            unit_name=row["unit_name"],
-            unit_price=_to_money_view(row),
-        )
-
-    @override
-    def to_price_type_view(self, row: RowMapping) -> PriceTypeView:
-        return PriceTypeView(
-            price_type_id=row["price_type_id"],
-            is_supported=row["is_supported"],
         )
 
 

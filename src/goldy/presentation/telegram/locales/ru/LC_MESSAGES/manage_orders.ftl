@@ -28,6 +28,7 @@ manage-orders-card =
     Итого: { $total }
 manage-orders-line = { $position }. { $name } — { $quantity } × { $price } = { $total } · { $stock }
 manage-orders-customer-blocked = ⚠ покупатель заблокирован
+manage-orders-cancelled-by-name = Отменил(а): { $name }
 manage-orders-status-button = Сменить статус
 manage-orders-status-prompt = В какой статус перевести заказ?
 manage-orders-reason-prompt = Отправьте причину отмены — её увидит покупатель.

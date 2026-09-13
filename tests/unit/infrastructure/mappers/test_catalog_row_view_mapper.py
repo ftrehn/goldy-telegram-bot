@@ -6,8 +6,6 @@ from goldy.infrastructure.mappers.sqlalchemy_catalog_row_view_mapper import (
 from tests.unit.factories.catalog_row_factories import (
     make_category_projection_row,
     make_listing_row,
-    make_price_type_projection_row,
-    make_priced_product_row,
     make_product_card_row,
 )
 
@@ -82,39 +80,3 @@ def test_a_product_nobody_grouped_keeps_neither_id_nor_group_name() -> None:
 
     assert view.category_id is None
     assert view.category_name is None
-
-
-def test_a_priced_row_says_which_product_it_is_about() -> None:
-    """``product_id`` is labelled: a priced row carries two ids and one name."""
-    view = MAPPER.to_priced_product_view(make_priced_product_row())
-
-    assert view.product_id == "1c-product-1"
-    assert view.unit_id == "1c-unit-796"
-    assert view.is_priced is True
-
-
-def test_a_product_the_price_list_skips_cannot_become_an_order_line() -> None:
-    """The one and only source of ``ProductNotPricedError`` at checkout."""
-    view = MAPPER.to_priced_product_view(make_priced_product_row(price=None))
-
-    assert view.unit_price is None
-    assert view.is_priced is False
-
-
-def test_a_product_without_an_article_keeps_none() -> None:
-    """``None`` must not become the string ``"None"`` on the way out."""
-    view = MAPPER.to_priced_product_view(make_priced_product_row(with_sku=False))
-
-    assert view.sku is None
-
-
-def test_a_price_list_in_a_currency_we_do_not_know_comes_back_unsupported() -> None:
-    """Stored rather than dropped, so the customer gets a plain refusal."""
-    supported = MAPPER.to_price_type_view(make_price_type_projection_row())
-    unknown = MAPPER.to_price_type_view(
-        make_price_type_projection_row("1c-price-type-usd", is_supported=False),
-    )
-
-    assert supported.is_supported is True
-    assert unknown.price_type_id == "1c-price-type-usd"
-    assert unknown.is_supported is False

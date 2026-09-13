@@ -1,6 +1,6 @@
 """The two decisions the projection writer makes on its own.
 
-Everything else in this gateway is SQL, and SQL is what the integration suite
+Everything else in this DAO is SQL, and SQL is what the integration suite
 is for. What can be settled without a database is the pair of things computed
 in Python before a statement is built: where a category sits in the tree the
 batch describes, and whether this shop can price in the currency 1C
@@ -9,7 +9,7 @@ denominated a price list in.
 
 from goldy.domain.common.values.currency import Currency
 from goldy.infrastructure.adapters.persistence import (
-    sqlalchemy_catalog_projection_gateway as projection,
+    sqlalchemy_catalog_projection_dao as projection,
 )
 from tests.unit.factories.catalog_factories import make_category_id, make_category_row
 

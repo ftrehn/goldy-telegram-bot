@@ -1,19 +1,27 @@
 from typing import Final, final
 
-from goldy.application.common.ports.catalog import PricingGateway
-from goldy.application.common.ports.identity_provider import IdentityProvider
+from goldy.application.common.ports.catalog import PricingReader
 from goldy.application.error import (
     PriceTypeNotConfiguredError,
     UnsupportedPriceTypeError,
 )
 from goldy.domain.catalog.values.price_type_id import PriceTypeId
+from goldy.domain.users.values.user_id import UserId
 
 
 @final
-class PriceTypeProvider:
-    """Resolves which price list the person in front of us buys at.
+class PriceTypeResolver:
+    """Resolves which price list a given person buys at.
 
-    The gateway distinguishes three outcomes and only one of them is ordinary.
+    A price type is a fact about a person, and the mechanism is visible in the
+    signature: the handler names the person — by the id ``IdentityProvider``
+    took from the update, the same way every other handler learns who is
+    asking — and the resolver joins that person's phone number against the
+    bindings 1C exported, falling back to the price list configured for the
+    bot. Nothing here is taken from a hidden context; there is no context to
+    take it from.
+
+    The reader distinguishes three outcomes and only one of them is ordinary.
     Turning the other two into errors happens once, here, rather than in every
     handler that needs a price type — the same move ``UserProvider`` makes with
     "the gateway returned None", and for the same reason: a handler that forgot
@@ -25,21 +33,11 @@ class PriceTypeProvider:
     failure of this whole stage that looks like dishonesty rather than a bug.
     """
 
-    def __init__(
-        self,
-        identity_provider: IdentityProvider,
-        pricing_gateway: PricingGateway,
-    ) -> None:
-        self._identity_provider: Final[IdentityProvider] = identity_provider
-        self._pricing_gateway: Final[PricingGateway] = pricing_gateway
+    def __init__(self, pricing_reader: PricingReader) -> None:
+        self._pricing_reader: Final[PricingReader] = pricing_reader
 
-    async def current(self) -> PriceTypeId:
-        """The price list of whoever is running this request.
-
-        There is no ``for_user`` counterpart to ``UserProvider.by_id``, and the
-        asymmetry is deliberate: a price list is only ever resolved for the
-        person the request belongs to. Naming somebody else would be a way to
-        show one customer another customer's prices.
+    async def resolve_for(self, user_id: UserId) -> PriceTypeId:
+        """The price list this person buys at.
 
         Raises:
             PriceTypeNotConfiguredError: the projection holds neither a binding
@@ -49,18 +47,17 @@ class PriceTypeProvider:
             UnsupportedPriceTypeError: their price list is denominated in a
                 currency this service does not know, and 1C sent it anyway.
         """
-        user_id = await self._identity_provider.get_current_user_id()
-        view = await self._pricing_gateway.read_price_type_for(user_id)
+        resolved = await self._pricing_reader.read_price_type_for(user_id)
 
-        if view is None:
+        if resolved is None:
             msg = f"No price type is configured for user '{user_id}'."
             raise PriceTypeNotConfiguredError(msg)
 
-        if not view.is_supported:
+        if not resolved.is_supported:
             msg = (
-                f"Price type '{view.price_type_id}' is denominated in a "
+                f"Price type '{resolved.price_type_id}' is denominated in a "
                 f"currency this shop cannot price in."
             )
             raise UnsupportedPriceTypeError(msg)
 
-        return PriceTypeId(value=view.price_type_id)
+        return resolved.price_type_id

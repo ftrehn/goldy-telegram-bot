@@ -24,7 +24,6 @@ from goldy.application.commands.catalog.import_catalog.command import (
     ImportCatalogCommand,
 )
 from goldy.application.common.ports.carts import (
-    CartCommandGateway,
     CartQueryGateway,
 )
 from goldy.application.common.ports.catalog import CatalogScopeKind, CatalogSnapshot
@@ -33,7 +32,7 @@ from goldy.application.common.views.cart import CartLineView
 from goldy.application.common.views.money import MoneyView
 from goldy.domain.common.values.currency import Currency
 from goldy.domain.users.values.user_id import UserId
-from tests.integration.arrange import CommandSender, UserSeeder
+from tests.integration.arrange import CommandSender, UserSeeder, cart_provider_for
 from tests.integration.inject import inject
 from tests.unit.factories.catalog_factories import (
     BATCH_ID,
@@ -181,9 +180,8 @@ async def _fill_cart(
 ) -> None:
     """Puts ``{product number: quantity}`` in this person's cart, committed."""
     async with container(scope=Scope.REQUEST) as scope:
-        gateway: CartCommandGateway = await scope.get(CartCommandGateway)
         transaction: TransactionManager = await scope.get(TransactionManager)
-        cart = await gateway.ensure_for(user_id)
+        cart = await (await cart_provider_for(scope, user_id)).current_or_new()
 
         for index, quantity in items.items():
             cart.add_item(make_product_id(index), make_quantity(quantity))

@@ -78,6 +78,7 @@ orders_table: Final[Table] = Table(
     Column("recipient_last_name", String(MAX_NAME_COLUMN_LENGTH), nullable=True),
     Column("recipient_phone", PhoneNumberType, nullable=False),
     Column("cancelled_by", CancellationInitiatorType, nullable=True),
+    Column("cancelled_by_user_id", SA_UUID(as_uuid=True), nullable=True),
     Column("cancellation_reason", CancellationReasonType, nullable=True),
     Column("payment_confirmed_at", DateTime(timezone=True), nullable=True),
     Column("payment_confirmed_by", SA_UUID(as_uuid=True), nullable=True),
@@ -115,7 +116,7 @@ order_items_table: Final[Table] = Table(
     ),
     Column("position", Integer, primary_key=True, autoincrement=False),
     Column("product_id", SourceIdType(ProductId), nullable=False),
-    Column("sku", SkuType, nullable=True),
+    Column("sku", SkuType, nullable=False),
     Column("name", ProductNameType, nullable=False),
     Column("unit_id", String(MAX_SOURCE_ID_COLUMN_LENGTH), nullable=True),
     Column("unit_name", String(MAX_UNIT_NAME_COLUMN_LENGTH), nullable=False),
@@ -143,8 +144,9 @@ Every displayed field is a copy rather than a reference. ``product_id`` stays on
 the line so a customer can repeat an order and a future export can point at the
 right item, but nothing shown is read through it.
 
-``sku`` is nullable because the article is optional in 1C and a strict one here
-would refuse to place an order for a product the shop sells perfectly well.
+``sku`` is mandatory: the exchange sends the 1C code where the article is
+blank, so every product the shop sells has one, and a line without one would be
+a line nobody can read out to a manager.
 
 ``unit_id`` and ``unit_name`` are the two fields of ``UnitOfMeasure``, in that
 order, and ``unit_price_amount`` with ``unit_price_currency`` are the two of
@@ -157,8 +159,8 @@ def map_orders_table() -> None:
 
     ``events_collection`` is absent on purpose — it is not a column, SQLAlchemy
     leaves it unset on a loaded instance, and the command gateway injects the
-    request-scoped one on every read. Unlike the cart, an order genuinely
-    records events, so a missing collection here would fail on the first
+    request-scoped one on every read. An order records events on every
+    transition, so a missing collection here would fail on the first
     confirmation rather than eventually.
 
     Composite column order is the field order of ``Recipient``,
@@ -208,6 +210,7 @@ def map_orders_table() -> None:
                 orders_table.c.recipient_phone,
             ),
             "cancelled_by": orders_table.c.cancelled_by,
+            "cancelled_by_user_id": orders_table.c.cancelled_by_user_id,
             "cancellation_reason": orders_table.c.cancellation_reason,
             "created_at": orders_table.c.created_at,
             "updated_at": orders_table.c.updated_at,

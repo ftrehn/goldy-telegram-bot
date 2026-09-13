@@ -21,7 +21,7 @@ def test_every_value_object_is_unwrapped_to_a_primitive() -> None:
 
     view = MAPPER.to_view(row, [MAPPER.to_line_view(make_order_line_row())])
 
-    assert view.number == "1001"
+    assert view.number == "240913-3K7QXA"
     assert view.status == "new"
     assert view.price_type_id == "1c-price-type-wholesale"
     assert view.delivery_address == "Москва, Тверская 1, кв. 5"
@@ -83,11 +83,33 @@ def test_a_line_multiplies_its_own_snapshot_price() -> None:
     assert line.line_total.currency == "rub"
 
 
-def test_a_line_without_an_article_keeps_none() -> None:
-    """``None`` must not become the string ``"None"`` on the way out."""
-    line = MAPPER.to_line_view(make_order_line_row(with_sku=False))
+def test_the_article_is_unwrapped_like_every_other_value() -> None:
+    line = MAPPER.to_line_view(make_order_line_row(index=7))
 
-    assert line.sku is None
+    assert line.sku == "SKU-7"
+
+
+def test_a_cancelled_order_names_the_person_who_cancelled_it() -> None:
+    """A staff card reads "by whom", not only "by which side"."""
+    row = make_order_row(
+        status=OrderStatus.CANCELLED,
+        cancelled_by=CancellationInitiator.MANAGER,
+        cancellation_reason="Нет на складе",
+        canceller_name=("Мария", "Иванова"),
+    )
+
+    view = MAPPER.to_view(row, [])
+
+    assert view.cancelled_by == "manager"
+    assert view.cancelled_by_user_id is not None
+    assert view.cancelled_by_name == "Мария Иванова"
+
+
+def test_an_order_nobody_cancelled_names_nobody() -> None:
+    view = MAPPER.to_view(make_order_row(), [])
+
+    assert view.cancelled_by_user_id is None
+    assert view.cancelled_by_name is None
 
 
 def test_stock_is_shown_when_the_catalog_still_has_the_product() -> None:

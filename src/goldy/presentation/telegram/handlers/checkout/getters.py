@@ -13,6 +13,7 @@ from goldy.application.queries.carts.get_cart.query import GetCartQuery
 from goldy.application.queries.orders.get_last_delivery_address.query import (
     GetLastDeliveryAddressQuery,
 )
+from goldy.domain.orders.values.order_comment import MAX_ORDER_COMMENT_LENGTH
 from goldy.presentation.telegram.common.formatting import (
     flag,
     for_message_text,
@@ -104,12 +105,22 @@ async def address_getter(
     ``None`` is the ordinary answer for a first order rather than a failure:
     the button simply is not drawn and the screen waits for typing.
     """
-    last_address = await sender.send(GetLastDeliveryAddressQuery())
+    last = await sender.send(GetLastDeliveryAddressQuery())
 
     return {
-        "last_address": last_address or "",
-        "has_last_address": last_address is not None,
+        "last_address": last.address or "",
+        "has_last_address": last.is_known,
     }
+
+
+async def comment_getter(**_kwargs: Any) -> dict[str, Any]:
+    """The one number the comment screen prints: how long a note may be.
+
+    Read off the domain constant rather than typed into the text, so the
+    screen states exactly the bound ``OrderComment`` enforces and cannot
+    drift from it when the bound moves.
+    """
+    return {"max_length": MAX_ORDER_COMMENT_LENGTH}
 
 
 async def phone_getter(user: UserView, **_kwargs: Any) -> dict[str, Any]:

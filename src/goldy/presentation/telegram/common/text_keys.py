@@ -134,6 +134,8 @@ the product would hide goods the shop is perfectly able to sell.
 # ``ERROR_TEXTS``, which renders it with ``i18n.get(key)`` and no arguments —
 # so none of these messages may carry a placeholder.
 ERROR_CHECK_VALUE: Final[str] = "error-check-value"
+ADDRESS_OUTSIDE_RUSSIA: Final[str] = "address-outside-russia"
+ADDRESS_WITHOUT_BUILDING: Final[str] = "address-without-building"
 """The tail entry for ``DomainFieldError``.
 
 Last by construction rather than by dictionary order: the MRO walk in the error
@@ -406,6 +408,12 @@ customer's own card leaves it unset.
 """
 
 MANAGE_ORDERS_CUSTOMER_BLOCKED: Final[str] = "manage-orders-customer-blocked"
+MANAGE_ORDERS_CANCELLED_BY_NAME: Final[str] = "manage-orders-cancelled-by-name"
+"""Staff only: which person stopped the order, under the line saying which side.
+
+The customer's card does not draw it. "Cancelled by you" needs no name, and
+"cancelled by the shop" must not hand a customer the name of an employee.
+"""
 MANAGE_ORDERS_STATUS_BUTTON: Final[str] = "manage-orders-status-button"
 MANAGE_ORDERS_STATUS_PROMPT: Final[str] = "manage-orders-status-prompt"
 MANAGE_ORDERS_REASON_PROMPT: Final[str] = "manage-orders-reason-prompt"

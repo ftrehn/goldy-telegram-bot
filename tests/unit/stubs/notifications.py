@@ -1,18 +1,23 @@
-"""Stand-ins for the two ports the notifier cannot exercise in a unit test.
+"""Stand-ins for the ports the notifier cannot exercise in a unit test.
 
-The inbox is a table and the sender is the Bot API. Everything else in these
-tests is the real thing — including the Fluent renderer, because "the message
-rendered" is one of the decisions under test rather than scaffolding.
+The inbox is a table, the sender is the Bot API and the mediator is a stack of
+pipelines over a session. Everything else in these tests is the real thing —
+including the Fluent renderer, because "the message rendered" is one of the
+decisions under test rather than scaffolding.
 """
 
-from typing import Final, final, override
+from typing import Final, cast, final, override
 from uuid import UUID
 
+from goldy.application.commands.notifications.outcome import NotificationOutcome
+from goldy.application.common.mediator.markers import BaseRequest
+from goldy.application.common.mediator.sender import Sender
 from goldy.application.common.ports.notifications import (
     InboxGateway,
     NotificationSender,
     OutgoingNotification,
 )
+from goldy.application.error import NotificationUndeliverableError
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
 
 
@@ -40,10 +45,11 @@ class InMemoryInboxGateway(InboxGateway):
 class RecordingNotificationSender(NotificationSender):
     """Remembers what was sent, and can refuse or fail on demand.
 
-    ``unreachable`` is somebody who blocked the bot — an ordinary answer, so
-    ``send`` returns False. ``failure`` is the other kind: a timeout or a 5xx,
-    which the real adapter turns into an exception precisely so the broker
-    redelivers the message.
+    ``unreachable`` is somebody who blocked the bot — an answer the messenger
+    gives again tomorrow, so ``send`` raises ``NotificationUndeliverableError``
+    the way the real adapter does. ``failure`` is the other kind: a timeout or
+    a 5xx, which the real adapter turns into an infrastructure error precisely
+    so the broker redelivers the message.
     """
 
     def __init__(
@@ -61,15 +67,15 @@ class RecordingNotificationSender(NotificationSender):
         return self._platform
 
     @override
-    async def send(self, notification: OutgoingNotification) -> bool:
+    async def send(self, notification: OutgoingNotification) -> None:
         if self.failure is not None:
             raise self.failure
 
         if notification.external_id in self.unreachable:
-            return False
+            msg = f"Account {notification.external_id} cannot be written to."
+            raise NotificationUndeliverableError(msg)
 
         self.sent.append(notification)
-        return True
 
     def text_to(self, external_id: str) -> str:
         """What this account was told, as one string.
@@ -84,3 +90,20 @@ class RecordingNotificationSender(NotificationSender):
             raise AssertionError(msg)
 
         return "\n".join(texts)
+
+
+@final
+class RecordingSender(Sender):
+    """Keeps every request it was handed and answers with one delivery.
+
+    What a subscriber test wants to know is which command was built out of a
+    broker message, not what the handler behind it would have done.
+    """
+
+    def __init__(self) -> None:
+        self.requests: list[BaseRequest[object]] = []
+
+    @override
+    async def send[TResponse](self, request: BaseRequest[TResponse]) -> TResponse:
+        self.requests.append(request)
+        return cast("TResponse", NotificationOutcome(delivered=1, skipped=0))

@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 
 from goldy.application.common.mediator.markers import Query
+from goldy.application.common.views.order import LastDeliveryAddressView
 
 
 @dataclass(frozen=True, slots=True)
-class GetLastDeliveryAddressQuery(Query[str | None]):
+class GetLastDeliveryAddressQuery(Query[LastDeliveryAddressView]):
     """Where this person's previous order went, to offer as a button.
 
     Carries nothing, for the same reason ``ListMyOrdersQuery`` carries no
@@ -13,12 +14,8 @@ class GetLastDeliveryAddressQuery(Query[str | None]):
     asked for. An address is the most personal thing this bot stores, and the
     cheapest way to keep it unreachable is to have nowhere to name a stranger.
 
-    Answers with the address as text rather than with a view. It is one
-    nullable string and a wrapper around it would carry no second fact; the
-    response is declared here because it is not a view, which is where the
-    convention puts it.
-
-    ``None`` is the ordinary answer for somebody ordering for the first time,
+    Answers with ``LastDeliveryAddressView``, whose one field is ``None``
+    for somebody ordering for the first time. That is the ordinary answer and
     not a failure: the address screen simply draws no button and waits for
     typing.
     """

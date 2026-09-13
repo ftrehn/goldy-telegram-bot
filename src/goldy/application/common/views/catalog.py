@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -43,7 +44,7 @@ class CategoryListView:
     """
 
     parent: CategoryView | None
-    categories: tuple[CategoryView, ...]
+    categories: Sequence[CategoryView]
 
     @property
     def is_root_level(self) -> bool:
@@ -72,7 +73,7 @@ class ProductListItemView:
     """
 
     id: str
-    sku: str | None
+    sku: str
     name: str
     unit_name: str
     unit_price: MoneyView | None
@@ -100,7 +101,7 @@ class ProductView:
     """
 
     id: str
-    sku: str | None
+    sku: str
     name: str
     full_name: str | None
     category_id: str | None
@@ -138,7 +139,7 @@ class ProductListView:
     is drawn from the same request that drew the rows.
     """
 
-    products: tuple[ProductListItemView, ...]
+    products: Sequence[ProductListItemView]
     total: int
 
 
@@ -153,7 +154,7 @@ class ProductSearchView:
     its articles unique, because 1C does not make it.
     """
 
-    products: tuple[ProductListItemView, ...]
+    products: Sequence[ProductListItemView]
     total: int
     exact_sku_product_id: str | None
 
@@ -161,52 +162,6 @@ class ProductSearchView:
     def is_empty(self) -> bool:
         """An empty result is a screen of its own, not an error."""
         return not self.products
-
-
-@dataclass(frozen=True, slots=True)
-class PriceTypeView:
-    """The price type a customer buys at, resolved in one query.
-
-    Deliberately narrow. The binding is keyed by phone number in the
-    projection and falls back to the price type configured for the bot, so by
-    the time this is built the question "which price list" is already answered
-    and only two facts are left to carry.
-
-    ``is_supported`` is false when 1C sent a currency this service does not
-    know. Handing back the default price list instead would show that customer
-    somebody else's prices without telling them, so the provider turns this
-    flag into a refusal rather than a fallback.
-    """
-
-    price_type_id: str
-    is_supported: bool
-
-
-@dataclass(frozen=True, slots=True)
-class PricedProductView:
-    """A product as the pricing read model has it, before it becomes a value.
-
-    This is the raw side of the boundary ``PricedProduct`` sits on the other
-    side of: primitives read out of the projection, which an application
-    service validates into domain values before an order is allowed to keep
-    them as a snapshot.
-
-    ``unit_price`` may be missing for the same reason it may be missing in a
-    listing — no row under this customer's price type. At checkout that is not
-    cosmetic, and it is the one and only source of ``ProductNotPricedError``.
-    """
-
-    product_id: str
-    sku: str | None
-    name: str
-    unit_id: str | None
-    unit_name: str
-    unit_price: MoneyView | None
-
-    @property
-    def is_priced(self) -> bool:
-        """Whether this product can be turned into an order line at all."""
-        return self.unit_price is not None
 
 
 @dataclass(frozen=True, slots=True)

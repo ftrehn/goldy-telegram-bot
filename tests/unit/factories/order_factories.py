@@ -1,9 +1,8 @@
 """Builders for what crosses the application layer on the order side.
 
 Separate from ``shop_factories`` for the reason ``catalog_factories`` is: none
-of this is a domain value. A priced product view is what the pricing read model
-hands over before anything has been validated, and an order view is what a card
-looks like once a row mapper has been over it — neither is ever an aggregate.
+of this is a domain value. An order view is what a card looks like once a row
+mapper has been over it — never an aggregate.
 
 Products are numbered exactly as they are in the domain builders, so a test
 that puts product 7 in a cart and prices product 7 here is talking about one
@@ -14,7 +13,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from goldy.application.common.views.catalog import PricedProductView
 from goldy.application.common.views.money import MoneyView
 from goldy.application.common.views.order import (
     OrderLineView,
@@ -41,28 +39,6 @@ from tests.unit.factories.shop_factories import (
 )
 
 PLACED_AT: datetime = datetime(2026, 3, 1, 12, 0, tzinfo=UTC)
-
-
-def make_priced_product_view(
-    index: int = 1,
-    price: str | None = UNIT_PRICE,
-    currency: Currency = Currency.RUB,
-    *,
-    with_sku: bool = True,
-) -> PricedProductView:
-    """One row of the pricing read model.
-
-    ``price=None`` is how a test asks for a product the storefront shows as
-    "price on request": present in the catalog, impossible to order.
-    """
-    return PricedProductView(
-        product_id=make_product_id_value(index),
-        sku=f"SKU-{index}" if with_sku else None,
-        name=f"Товар {index}",
-        unit_id="1c-unit-796",
-        unit_name=UNIT_NAME,
-        unit_price=None if price is None else make_money_view(price, currency),
-    )
 
 
 def make_order_line_view(
@@ -127,6 +103,8 @@ def make_order_view(
         recipient_phone_number=CUSTOMER_PHONE,
         comment=None,
         cancelled_by=None,
+        cancelled_by_user_id=None,
+        cancelled_by_name=None,
         cancellation_reason=None,
         lines=order_lines,
         total=total,

@@ -18,9 +18,9 @@ from goldy.domain.orders.values.order_status import OrderStatus
 from goldy.infrastructure.adapters.outbox.retort_event_serializer import (
     RetortEventSerializer,
 )
+from tests.unit.factories.domain_factories import make_user_id
 from tests.unit.factories.shop_factories import (
     DELIVERY_ADDRESS,
-    ORDER_NUMBER,
     make_delivery_address,
     make_order,
     make_order_line,
@@ -52,7 +52,7 @@ def test_placing_an_order_produces_a_payload_json_accepts() -> None:
     assert isinstance(payload["total_amount"], str)
     assert payload["currency"] == "rub"
     assert payload["line_count"] == 1
-    assert payload["order_number"] == ORDER_NUMBER
+    assert payload["order_number"] == str(order.number)
 
 
 def test_an_order_event_carries_no_personal_data() -> None:
@@ -83,6 +83,7 @@ def test_every_transition_serialises_through_the_one_status_event() -> None:
     order, collection = make_order(status=OrderStatus.CONFIRMED)
     order.cancel(
         initiated_by=CancellationInitiator.MANAGER,
+        cancelled_by_user_id=make_user_id(),
         reason=CancellationReason(value=CANCELLATION_REASON),
     )
 

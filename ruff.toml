@@ -58,6 +58,12 @@ ignore = [
     "DOC502",
 
     "COM812", # disable with format
+
+    # Preview rule from ruff 0.16.6 that bans `autouse=True` outright. The
+    # session fixtures that start the test containers and map the tables
+    # exist to run implicitly; requesting them from every test by name is
+    # the noise the rule's own docs call "pedantic".
+    "pytest-fixture-autouse",
 ]
 
 [lint.per-file-ignores]

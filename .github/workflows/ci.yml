@@ -34,7 +34,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
           python-version: "3.14"
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2.81.8
+      - uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: just
       - run: uv sync --frozen --group dev
@@ -60,7 +60,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
           python-version: "3.14"
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2.81.8
+      - uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: just
       - run: uv sync --frozen --group dev
@@ -78,7 +78,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
           python-version: "3.14"
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2.81.8
+      - uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: just
       - run: uv sync --frozen --group dev
@@ -96,7 +96,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
           python-version: "3.14"
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2.81.8
+      - uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: just
       - run: uv sync --frozen --group dev
@@ -116,7 +116,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
           python-version: "3.14"
-      - uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154 # v2.81.8
+      - uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: just
       - run: uv sync --frozen --group dev

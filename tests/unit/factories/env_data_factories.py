@@ -66,6 +66,7 @@ def telegram_env(**overrides: str) -> dict[str, str]:
         "TELEGRAM_USE_I18N_ISOLATION": "true",
         "TELEGRAM_DEFAULT_LOCALE": "ru",
         "TELEGRAM_DROP_PENDING_UPDATES": "true",
+        "TELEGRAM_FSM_TTL_SECONDS": "604800",
     } | overrides
 
 

@@ -50,3 +50,9 @@ catalog-search-title = Found { $total } for "{ $term }" across the whole catalog
 catalog-search-empty = Nothing matched "{ $term }". Check the article, or try another word.
 catalog-search-again-button = Search again
 catalog-to-catalog-button = To the catalog
+
+# Links from the website. No placeholders: the product is either withdrawn or
+# was never real, so there is nothing to name it with — and Fluent refuses to
+# render a message whose argument nobody can fill.
+deeplink-product-gone = That link points at a product the catalog no longer has. Here is the catalog — have a look at something similar.
+deeplink-category-gone = The section that link pointed at is no longer in the catalog. Here is the catalog from the first screen.

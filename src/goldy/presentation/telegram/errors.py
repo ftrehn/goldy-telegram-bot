@@ -21,3 +21,24 @@ class ContactBelongsToSomeoneElseError(TelegramPresentationError):
 
 class ContactHasNoPhoneNumberError(TelegramPresentationError):
     """Raised when a contact arrives with no number on it at all."""
+
+
+class DeepLinkPayloadTooLongError(TelegramPresentationError):
+    """Raised when an identifier will not fit in the 64 characters ``/start`` has.
+
+    Deliberately absent from ``ERROR_TEXTS``, unlike the three above. Those are
+    raised while serving somebody's update and need words a customer can read;
+    this one is raised while *building* a link, by an export or by a manager's
+    tool, where the reader is us and the right outcome is a failure loud enough
+    to stop the batch. A link built from a truncated identifier is not a
+    shorter link, it is a link that opens the wrong product.
+    """
+
+
+class BotWithoutUsernameError(TelegramPresentationError):
+    """Raised when Telegram reports this bot has no username to address.
+
+    Cannot happen to a bot that BotFather created, and is still checked: the
+    alternative is an ``https://t.me/None/?start=…`` printed onto a web page,
+    where nothing fails until a customer clicks it.
+    """

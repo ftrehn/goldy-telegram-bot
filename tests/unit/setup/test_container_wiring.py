@@ -22,6 +22,7 @@ from dishka import make_async_container
 from dishka.exceptions import GraphMissingFactoryError
 
 from goldy.setup.ioc.containers import (
+    make_catalog_receiver_container,
     make_catalog_seed_container,
     make_telegram_container,
     make_worker_container,
@@ -33,6 +34,7 @@ from goldy.setup.ioc.providers import (
     shop_handlers_provider,
 )
 from tests.unit.factories.container_factories import (
+    create_catalog_receiver_context,
     create_catalog_seed_context,
     create_telegram_context,
     create_worker_context,
@@ -53,6 +55,18 @@ def test_the_worker_container_is_fully_wired() -> None:
 
 def test_the_catalog_seed_container_is_fully_wired() -> None:
     container = make_catalog_seed_container(create_catalog_seed_context())
+
+    assert container is not None
+
+
+def test_the_catalog_receiver_container_is_fully_wired() -> None:
+    """The seeder's graph with the file source taken out still closes.
+
+    The mapper moved into a group of its own so the receiver could take it
+    without ``CatalogSource``; this is where a mapper dependency left behind
+    in the source group would show up, as a build that fails naming it.
+    """
+    container = make_catalog_receiver_container(create_catalog_receiver_context())
 
     assert container is not None
 

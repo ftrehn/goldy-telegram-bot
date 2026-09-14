@@ -9,6 +9,9 @@ from taskiq import AsyncBroker, ScheduleSource
 from goldy.setup.bootstrap.loaders.admin_config_loader import AdminConfigLoader
 from goldy.setup.bootstrap.loaders.alchemy_config_loader import SQLAlchemyConfigLoader
 from goldy.setup.bootstrap.loaders.catalog_config_loader import CatalogConfigLoader
+from goldy.setup.bootstrap.loaders.catalog_receiver_config_loader import (
+    CatalogReceiverConfigLoader,
+)
 from goldy.setup.bootstrap.loaders.notification_config_loader import (
     NotificationConfigLoader,
 )
@@ -23,6 +26,9 @@ from goldy.setup.bootstrap.sources.alchemy_env_source_factory import (
 )
 from goldy.setup.bootstrap.sources.catalog_env_source_factory import (
     CatalogEnvSourceFactory,
+)
+from goldy.setup.bootstrap.sources.catalog_receiver_env_source_factory import (
+    CatalogReceiverEnvSourceFactory,
 )
 from goldy.setup.bootstrap.sources.notification_env_source_factory import (
     NotificationEnvSourceFactory,
@@ -43,6 +49,7 @@ from goldy.setup.bootstrap.sources.telegram_env_source_factory import (
 from goldy.setup.configs.admin_config import AdminConfig
 from goldy.setup.configs.alchemy_config import SQLAlchemyConfig
 from goldy.setup.configs.catalog_config import CatalogConfig
+from goldy.setup.configs.catalog_receiver_config import CatalogReceiverConfig
 from goldy.setup.configs.notification_config import NotificationConfig
 from goldy.setup.configs.postgres_config import PostgresConfig
 from goldy.setup.configs.rabbitmq_config import RabbitMQConfig
@@ -122,6 +129,18 @@ def load_notification_config() -> NotificationConfig:
     return NotificationConfigLoader(NotificationEnvSourceFactory()).load()
 
 
+def load_catalog_receiver_config() -> CatalogReceiverConfig:
+    """Read only by the catalog receiver — where it listens and what it accepts.
+
+    Loaded apart from the shared bundle for the reason the bot's and the
+    worker's own configs are: the token 1C presents belongs to the one process
+    that checks it. Putting it into ``SharedConfigs`` would carry it into
+    every container through ``configs_provider``, and a bot that can resolve
+    the receiver's secret is a bot with one more thing to leak.
+    """
+    return CatalogReceiverConfigLoader(CatalogReceiverEnvSourceFactory()).load()
+
+
 def make_worker_container_context(
     configs: SharedConfigs,
     broker: AsyncBroker,
@@ -165,4 +184,25 @@ def make_telegram_container_context(
         **configs.as_context(),
         TelegramConfig: telegram_config,
         Bot: bot,
+    }
+
+
+def make_catalog_receiver_container_context(
+    configs: SharedConfigs,
+    receiver_config: CatalogReceiverConfig,
+) -> dict[type, object]:
+    """The context the catalog receiver's container is built from.
+
+    ``CatalogReceiverConfig`` enters here and nowhere else, the way
+    ``TelegramConfig`` does for the bot: only the process that listens for 1C
+    has one, so no other container is ever handed the token. Nothing in the
+    graph resolves it today — the application takes the token and the body
+    ceiling as plain arguments — but a provider that ever needs it will find
+    it here and only here. The aiohttp application is not in the context: it
+    is built *from* the container, by ``create_catalog_receiver_app``, and
+    opens a request scope on it per batch.
+    """
+    return {
+        **configs.as_context(),
+        CatalogReceiverConfig: receiver_config,
     }

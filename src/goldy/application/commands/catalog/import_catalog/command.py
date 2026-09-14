@@ -11,9 +11,9 @@ class ImportCatalogCommand(Command[CatalogImportResponse]):
 
     **This command is the seam of the integration**, and the snapshot is built
     by whoever sends it. The CLI seeder reads one from a file through
-    ``CatalogSource``; the RabbitMQ consumer that comes later builds one out of
-    a message it was handed. Neither of them is a dependency of the handler,
-    which is what lets the same command serve a puller and a pusher.
+    ``CatalogSource``; the HTTP receiver 1C posts to builds one out of the
+    request body. Neither of them is a dependency of the handler, which is
+    what lets the same command serve a puller and a pusher.
 
     A **batch**, never the whole catalog. 1C sends its nomenclature in parts
     and exports prices and stock separately from the reference itself, so

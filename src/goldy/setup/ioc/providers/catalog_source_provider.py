@@ -4,12 +4,6 @@ from typing import Final
 from dishka import Provider, Scope
 
 from goldy.application.common.ports.catalog import CatalogSource
-from goldy.infrastructure.adapters.catalog.adaptix_catalog_snapshot_mapper import (
-    AdaptixCatalogSnapshotMapper,
-)
-from goldy.infrastructure.adapters.catalog.catalog_snapshot_mapper import (
-    CatalogSnapshotMapper,
-)
 from goldy.infrastructure.adapters.catalog.json_file_catalog_source import (
     JsonFileCatalogSource,
 )
@@ -33,16 +27,12 @@ def catalog_source_provider() -> Provider:
     ``Path`` is a coarse key anywhere else and an unambiguous one here - this
     container has exactly one file in it.
 
-    The mapper that reads the contract off the decoded document is ``APP``
-    scoped: its retort is built once at import time and it holds nothing of
-    one run.
+    The mapper the source reads the contract with is not in this group. It
+    comes from ``catalog_snapshot_mapper_provider``, which the catalog
+    receiver takes without this one: 1C posts the same documents over HTTP,
+    and that process has a mapper to read them with and no file to read.
     """
     provider: Final[Provider] = Provider(scope=Scope.REQUEST)
     provider.from_context(provides=Path, scope=Scope.REQUEST)
-    provider.provide(
-        source=AdaptixCatalogSnapshotMapper,
-        provides=CatalogSnapshotMapper,
-        scope=Scope.APP,
-    )
     provider.provide(source=JsonFileCatalogSource, provides=CatalogSource)
     return provider

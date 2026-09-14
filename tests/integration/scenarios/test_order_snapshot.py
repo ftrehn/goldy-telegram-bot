@@ -144,10 +144,10 @@ def _snapshot_of(line: OrderLineView) -> tuple[object, ...]:
 def _a_catalog_that_moved_on() -> CatalogSnapshot:
     """A run of the exchange that changes everything an order line copied.
 
-    Stamped later than the first one because the upsert is conditional on the
-    timestamp the source put on the row — a batch that did not move it forward
-    would be discarded as a replay, and the test would pass without the catalog
-    ever having changed.
+    Stamped later than the first one, the way 1C dates a price it set later.
+    The upsert no longer compares the stamp — whatever a run sends is written
+    — so the later date is what the row would really carry rather than what
+    gets it past a guard.
     """
     return make_snapshot(
         batch_id=THIRD_BATCH_ID,

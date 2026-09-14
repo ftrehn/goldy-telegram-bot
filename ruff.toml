@@ -86,6 +86,9 @@ ignore = [
 # for its two buttons, and turning a page is a dictionary write with nothing to
 # await. The alternative is four dialogs each writing the same async wrapper.
 "src/goldy/presentation/telegram/common/paging.py" = ["RUF029"]
+# aiohttp registers only coroutine handlers, so `ping` is async by contract
+# even though it has nothing to await (it only reports the token was accepted).
+"src/goldy/infrastructure/catalog_receiver/handlers.py" = ["RUF029"]
 # Tests: asserts are the point (S101); fake credentials and magic literals are
 # expected fixture data (S105/S106/S107/PLR2004); object-mother factories take
 # many keyword args (PLR0913); a test names every fixture it needs and pytest

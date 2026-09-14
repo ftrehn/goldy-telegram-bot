@@ -22,7 +22,7 @@ from adaptix import Retort, loader
 from adaptix.load_error import AggregateLoadError, LoadError, ValueLoadError
 from adaptix.struct_trail import get_trail
 
-from goldy.application.common.ports.catalog import CatalogSnapshot
+from goldy.application.common.ports.catalog import CatalogScope, CatalogSnapshot
 from goldy.infrastructure.adapters.catalog.catalog_snapshot_mapper import (
     CatalogSnapshotMapper,
 )
@@ -65,7 +65,13 @@ _retort: Final[Retort] = Retort(
 
 @final
 class AdaptixCatalogSnapshotMapper(CatalogSnapshotMapper):
-    """Reads a snapshot off a decoded JSON document with the retort above."""
+    """Reads a snapshot, or a scope on its own, off a decoded JSON document.
+
+    Both readings go through the one retort above, which is the point of
+    having the second: the scope of a finalisation is refused by exactly the
+    rules the scope of a snapshot is, down to the list of kinds in the
+    message.
+    """
 
     @override
     def to_snapshot(self, document: object) -> CatalogSnapshot:
@@ -76,6 +82,15 @@ class AdaptixCatalogSnapshotMapper(CatalogSnapshotMapper):
             msg = f"The catalog snapshot is not shaped like one: {reasons}."
             raise CatalogSourceReadError(msg) from exc
 
+    @override
+    def to_scope(self, document: object) -> CatalogScope:
+        try:
+            return _retort.load(document, CatalogScope)
+        except LoadError as exc:
+            reasons = "; ".join(_leaves(exc, trail="scope"))
+            msg = f"The catalog scope is not shaped like one: {reasons}."
+            raise CatalogSourceReadError(msg) from exc
+
 
 def _leaves(exc: BaseException, trail: str = "") -> Iterator[str]:
     """Every refusal in the tree adaptix raised, each with the path it names.
@@ -84,6 +99,11 @@ def _leaves(exc: BaseException, trail: str = "") -> Iterator[str]:
     errors, and each error carries the trail from its parent. Flattened, the
     seeder prints ``products[7].name: expected a string`` and whoever runs it
     fixes the fixture instead of guessing at it.
+
+    *trail* is where the document sat in the body it was cut out of. A scope
+    read on its own starts at ``scope``, so its fields are still named
+    ``scope.kind`` and a refusal of the whole of it is named ``scope`` — the
+    same words the reader of the body would use to find it.
     """
     path = trail + "".join(
         f"[{segment}]" if isinstance(segment, int) else f".{segment}"

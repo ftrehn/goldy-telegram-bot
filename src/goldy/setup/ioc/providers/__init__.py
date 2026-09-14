@@ -1,3 +1,4 @@
+from .catalog_snapshot_mapper_provider import catalog_snapshot_mapper_provider
 from .catalog_source_provider import catalog_source_provider
 from .configs_provider import configs_provider
 from .database_provider import database_provider
@@ -21,6 +22,7 @@ from .telegram_provider import TelegramProvider, telegram_context_provider
 __all__ = [
     "TelegramProvider",
     "bootstrap_handlers_provider",
+    "catalog_snapshot_mapper_provider",
     "catalog_source_provider",
     "configs_provider",
     "database_provider",

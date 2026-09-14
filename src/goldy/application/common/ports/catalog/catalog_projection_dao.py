@@ -22,23 +22,25 @@ class CatalogProjectionDao(Protocol):
     A DAO and not a gateway, and the name is a promise about the shape of the
     methods. A gateway in this project is thin — it hands whole aggregates
     in and out and lets the unit of work do the writing — while this port
-    takes batches of rows and upserts them conditionally, sweeps by a stamp
-    and counts what it touched. That is data access written for throughput,
-    and calling it a gateway would invite somebody to expect an aggregate
-    behind it. There is none: the projection is Core-only and builds no
-    domain values on its way in.
+    takes batches of rows and upserts them, sweeps by a stamp and counts what
+    it touched. That is data access written for throughput, and calling it a
+    gateway would invite somebody to expect an aggregate behind it. There is
+    none: the projection is Core-only and builds no domain values on its way
+    in.
 
     Upserts take a batch in and stamp ``batch_id`` on every row they touch;
     :meth:`finalize` removes what that batch did not mention. The two are
     separate because 1C sends its data in parts, and a single call meaning
     "this is the whole catalog now" would let the second part erase the first.
 
-    Upserts are conditional on ``source_changed_at`` rather than merely keyed
-    by id. RabbitMQ reorders messages and repeats them after a restart, and
-    ``synced_at`` is stamped by us, so it cannot tell a fresh message from a
-    redelivered old one: without the condition, a replayed old message would
-    overwrite a new price with an old one and mark itself fresh, after which
-    the sweep would leave it alone.
+    Upserts are unconditional: a row that arrives replaces the row stored,
+    and ``source_changed_at`` is kept as a fact about the row rather than
+    used as a guard. The exchange with 1C is synchronous and ordered
+    (ADR-0004), and its one sender posts the current state of 1C on every
+    run, so there is no older delivery that could arrive after a newer one.
+    What does arrive is a price 1C rolled back to an earlier date, and a
+    write conditional on the date would refuse exactly that row — leave it
+    unstamped, and the sweep would take it for absent.
 
     Two things are decided where the rows are written rather than by a handler,
     because both are properties of the projection. ``path`` and ``depth`` on a
@@ -99,7 +101,11 @@ class CatalogProjectionDao(Protocol):
         a price the shop does not offer, which is money lost directly.
 
         The scope narrows the deletion to one price list or one warehouse, so
-        exporting a single price list cannot wipe the others.
+        exporting a single price list cannot wipe the others. The one sweep
+        that reaches across tables is the one over price types: a price list
+        the source stopped sending takes its prices and bindings with it,
+        because no later batch will ever be about that list and its own sweep
+        would never come.
         """
         raise NotImplementedError
 

@@ -136,8 +136,8 @@ class SqlAlchemyCartQueryGateway(CartQueryGateway):
     def _stock_column(self) -> Label[Decimal]:
         """Sums the warehouses, which is what makes warehouses a non-event.
 
-        1C gives no breakdown yet and the consumer writes a fixed warehouse,
-        but the sum is written from the first day: real warehouses appearing
+        The 1C extension exports the one warehouse it is configured with,
+        but the sum is written from the first day: more warehouses appearing
         then change neither this query nor the view it fills.
 
         Correlated per line rather than joined against one grouped subquery. A

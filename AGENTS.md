@@ -1,8 +1,8 @@
 # goldy
 
 A shop bot. It runs in Telegram today and MAX later, takes orders from
-customers, and reads its product catalog out of a 1C installation on another
-server over RabbitMQ.
+customers, and keeps a projection of the product catalog that a 1C installation
+on another server pushes to it over HTTP.
 
 **1C is read-only.** The catalog comes from it; customers, orders and everything
 else belong to this service. There is no counterparty, no synchronisation back,
@@ -15,11 +15,13 @@ src/goldy/
   domain/          business rules; imports nothing from other layers
   application/     use cases, ports, pipelines
   infrastructure/  adapters implementing the ports
+    catalog_receiver/  the aiohttp app 1C pushes catalog batches into
   presentation/    Telegram handlers, dialogs, middlewares
   setup/           configs, bootstrap, DI containers
   telegram_bot.py  bot entry point
   worker_app.py    taskiq worker entry point
   scheduler_app.py taskiq scheduler entry point
+  catalog_receiver_app.py  catalog receiver entry point — the one process 1C writes to
   catalog_seed_app.py  catalog seeder entry point — a JSON snapshot, no messenger
 tests/
   unit/            domain + application + our own infrastructure logic
@@ -34,6 +36,11 @@ Rules:
   import `setup` — the composition root depends on adapters, never the reverse.
 - These are **enforced**: `just import-linter` fails the build. Read
   `.importlinter` before moving a module.
+- Two infrastructure packages are allowed to send commands, and the contract
+  names them: `infrastructure.task_manager` (the event consumers) and
+  `infrastructure.catalog_receiver` (the HTTP entry 1C uses). Both are inputs
+  that arrive from a machine rather than a person, which is why they are not
+  `presentation`. Nothing else in `infrastructure` may import a handler.
 
 ## Vocabulary
 
@@ -259,6 +266,30 @@ Events carry primitives, not value objects: they are serialised, and their
 `event_id` / `event_date` are stamped at construction because the outbox row is
 keyed and ordered by them.
 
+## Catalog receiver
+
+1C pushes the catalog; the bot does not pull it and does not consume it off a
+queue. A scheduled job in the `ГолдиБот` extension (sources under
+`integrations/1c/`) posts batches to `infrastructure/catalog_receiver/`, an
+aiohttp app served by `python -m goldy.catalog_receiver_app` — a fourth process
+with its own port, its own bearer token and a container that holds nothing
+expecting a person. Why HTTP, why a separate process and why the handling is
+synchronous is [ADR-0004](docs/adr/0004-catalog-arrives-over-http-from-1c.md).
+
+The body of a batch is the same JSON the seeder reads, decoded by the same
+`AdaptixCatalogSnapshotMapper`, and both go through `ImportCatalogCommand` and
+`FinalizeCatalogImportCommand` — the receiver adds no logic of its own. It
+sends the command **inside the request** and answers after the transaction has
+committed, so 1C sends the next batch, and finally the sweep, only once the
+previous one is durable; that is what keeps "batches, then finalisation"
+ordered without any run state on our side. Errors map to status codes in one
+middleware: a body the mapper rejects is 400, a snapshot the handler refuses is
+422, anything else is 500 and logged. That middleware is the one place that
+catches `Exception` and turns it into a response rather than re-raising it as
+an `InfrastructureError`; the two adapters that also catch it (the outbox
+publisher and the notification sender) re-raise, which is the rule everywhere
+else.
+
 ## Infrastructure
 
 - **Postgres** + SQLAlchemy asyncio + asyncpg, **imperative mapping**
@@ -272,8 +303,12 @@ keyed and ordered by them.
   consumes anything.
 - **dishka** for DI, **aiogram** + **aiogram-dialog** for Telegram,
   **dishka-faststream** for the worker's subscribers.
+- **aiohttp** for the catalog receiver, with `dishka.integrations.aiohttp`
+  opening one `REQUEST` scope per request. A direct dependency now, not the
+  transitive one aiogram happens to bring.
 - **adaptix** for aggregate → view mapping and for reading the catalog
-  snapshot off a decoded JSON document (`AdaptixCatalogSnapshotMapper`).
+  snapshot off a decoded JSON document (`AdaptixCatalogSnapshotMapper`),
+  shared by the seeder and the receiver.
 
 Value objects reach the database through `TypeDecorator`s in
 `persistence/models/types.py`. Multi-field value objects are a `composite`.
@@ -301,7 +336,8 @@ assembled per process** in `setup/ioc/containers/`:
 |---|---|
 | `make_telegram_container` | core + interactive + Telegram + aiogram |
 | `make_worker_container` | core + task manager + outbox handlers + notifications + taskiq |
-| `make_catalog_seed_container` | core + the catalog source, and nothing that expects a person |
+| `make_catalog_seed_container` | core + the snapshot mapper + the catalog source, and nothing that expects a person |
+| `make_catalog_receiver_container` | core + the snapshot mapper, and nothing that expects a person or a broker |
 
 Handlers are grouped by **what they need**, not who calls them. Anything needing
 an `IdentityProvider` is in `user_handlers_provider`, which the worker does not
@@ -313,10 +349,11 @@ do not merge the groups to make a wiring error go away.
 `notifications_provider` is the same rule applied to a secret rather than to an
 identity. It carries the Bot API client and the token behind it, and only the
 worker gets it: the bot answers whoever wrote to it, while the worker writes to
-people who did not. `configs_provider` still hands `TelegramConfig` and
-`NotificationConfig` to nobody — each process contributes its own.
+people who did not. `configs_provider` still hands `TelegramConfig`,
+`NotificationConfig` and `CatalogReceiverConfig` to nobody — each process
+contributes its own, and the receiver's token reaches only the receiver.
 
-MAX will be a fourth container over the same core, differing only in how it
+MAX will be a fifth container over the same core, differing only in how it
 answers "who is writing".
 
 ## Configuration
@@ -418,9 +455,10 @@ Conventions this project insists on:
   explaining, explain it where the thing is defined.
 
 ```sh
-just bot               # the three processes and the seeder, with .env loaded
+just bot               # the four processes and the seeder, with .env loaded
 just worker            # (just bot .env.dev.example for another file)
 just scheduler
+just receiver          # the catalog receiver 1C posts to, port 8090 by default
 just seed docs/design/catalog-snapshot.example.json
 just lint              # ruff format + ruff check + codespell
 just mypy              # type check
@@ -472,6 +510,30 @@ Read the relevant entry before touching that area.
 - **adaptix links fields, not paths.** `P[User].full_name.first_name` is
   rejected, so every value object needs its own `link_function`. `id` needs one
   too — `UserId` is a `NewType`, which adaptix does not see through.
+
+**Catalog**
+
+- **`Артикул` in УТ is not unique and arrives with trailing spaces.** In the
+  owner's base one article is shared by more than a thousand products, and the
+  attribute is padded like every fixed-width 1C string. The extension trims it
+  and falls back to `Код` when it is blank; the projection stores `sku` with no
+  unique index, on purpose. Do not add one, and do not write a lookup that
+  assumes one SKU is one product — `/search <sku>` opens a card only when the
+  match is single, and a list otherwise, for exactly this reason.
+- **1C sends `source_changed_at` only for prices, and the upsert does not
+  compare it.** A price has a date it was set on, the period of the register
+  slice, and nothing else in the export has one — categories, products, price
+  types, stock and bindings all arrive with `null`. The upsert is
+  unconditional: on conflict the row is overwritten with whatever 1C sent,
+  older date included. The "never lower the version" guard of ADR-0002 was
+  written against RabbitMQ redelivering a stale message after a fresh one;
+  with a single sender posting batches in order over HTTP there is no stale
+  message, and the guard broke a real case — a cancelled price document rolls
+  the slice back to an earlier date, the guarded upsert refused it, and the
+  sweep then deleted the price. Keep the column: it is the date the price was
+  set, informative and still sent by 1C. Do not reintroduce a comparison on
+  it, and do not compare `synced_at` either — that would refuse the whole
+  catalog on the first rerun. Why: ADR-0004.
 
 **Wiring**
 

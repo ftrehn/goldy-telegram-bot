@@ -1,5 +1,6 @@
 """Object mothers for the already-built configs, bypassing the loaders."""
 
+from goldy.setup.configs.catalog_receiver_config import CatalogReceiverConfig
 from goldy.setup.configs.postgres_config import PostgresConfig
 from goldy.setup.configs.rabbitmq_config import RabbitMQConfig
 from goldy.setup.configs.redis_config import RedisConfig
@@ -51,6 +52,27 @@ def create_rabbitmq_config(
         user=user,
         password=password,
         vhost=vhost,
+    )
+
+
+def create_catalog_receiver_config(
+    *,
+    token: str = "test-catalog-token-0123456789abcdefghij",
+    host: str = "127.0.0.1",
+    port: int = 8090,
+    max_body_mib: int = 64,
+) -> CatalogReceiverConfig:
+    """Object mother for a valid :class:`CatalogReceiverConfig`.
+
+    Loopback, the same as the config's own default, and spelled out anyway: a
+    test that ever starts a site on this config must not open a port to the
+    network, and that must stay true if the default is ever changed.
+    """
+    return CatalogReceiverConfig(
+        token=token,
+        host=host,
+        port=port,
+        max_body_mib=max_body_mib,
     )
 
 

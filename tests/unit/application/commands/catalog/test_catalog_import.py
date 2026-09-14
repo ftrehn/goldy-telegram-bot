@@ -27,8 +27,8 @@ async def test_a_batch_writes_every_kind_it_carries_under_one_mark(
 ) -> None:
     """A batch is whatever its sender put in it.
 
-    The file the seeder reads holds the whole catalog at once while a consumer
-    message holds one kind, and both are this same call.
+    The file the seeder reads holds the whole catalog at once while a batch
+    1C posts holds one kind, and both are this same call.
     """
     snapshot = make_snapshot(
         categories=(make_category_row(1),),

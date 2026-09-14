@@ -52,9 +52,9 @@ def escape_like(value: str) -> str:
 def stock_total() -> ColumnElement[object]:
     """What is free to sell of this product, across every warehouse.
 
-    A sum rather than a column, from the first day. 1C gives no breakdown yet
-    and the consumer writes a fixed warehouse, so today this sums one row —
-    which is exactly why real warehouses arriving will change nothing here.
+    A sum rather than a column, from the first day. The 1C extension exports
+    the one warehouse it is configured with, so today this sums one row —
+    which is exactly why more warehouses arriving will change nothing here.
     """
     return (
         select(func.sum(catalog_stock_table.c.quantity))

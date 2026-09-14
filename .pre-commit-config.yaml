@@ -10,14 +10,22 @@ repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+    # integrations/1c/ext/ is what the 1C Designer dumps: CRLF, tabs, a BOM on
+    # every file, and a trailing newline where it decides. Those bytes are the
+    # contract with the Designer — "load from files" diffs them against what
+    # it would dump, and a hook that rewrites line endings or strips a final
+    # newline turns every file into a change the Designer wants to overwrite.
     -   id: trailing-whitespace
+        exclude: ^integrations/1c/ext/
     -   id: mixed-line-ending
+        exclude: ^integrations/1c/ext/
     -   id: check-case-conflict
     -   id: check-ast
     -   id: check-toml
     -   id: check-yaml
     -   id: check-added-large-files
     -   id: end-of-file-fixer
+        exclude: ^integrations/1c/ext/
 
 -   repo: https://github.com/crate-ci/typos
     rev: v1.38.1

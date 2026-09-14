@@ -1,4 +1,4 @@
-"""Stand-ins for the three catalog ports.
+"""Stand-ins for the three catalog ports, and for the sender the receiver calls.
 
 The read-side stubs answer with whatever a test put in them and record what
 they were asked, because that is where the interesting decisions of a catalog
@@ -6,20 +6,35 @@ handler are: which price type it resolved, which filters it built, and which
 page it asked for. Filtering in Python here would only reimplement the SQL
 these ports exist to hide, and then test the reimplementation.
 
-The projection stub is a recorder for the same reason. Whether an upsert
-refuses a stale row is decided by a SQL condition in the adapter, so a stub
-that reimplemented it would prove nothing about the handler that calls it.
+The projection stub is a recorder for the same reason. What an upsert and a
+sweep do to the rows is decided by the SQL in the adapter, so a stub that
+reimplemented it would prove nothing about the handler that calls it.
+
+The sender stub is the catalog receiver's counterpart of the notification
+one: what a receiver test wants to know is which command was built out of an
+HTTP body and what the body of the response was built out of, not what the
+handler behind the command would have done to the projection.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import final, override
+from typing import cast, final, override
 
+from goldy.application.commands.catalog.finalize_catalog_import.command import (
+    FinalizeCatalogImportCommand,
+)
+from goldy.application.commands.catalog.import_catalog.command import (
+    ImportCatalogCommand,
+)
+from goldy.application.commands.catalog.scope_description import describe_scope
+from goldy.application.common.mediator.markers import BaseRequest
+from goldy.application.common.mediator.sender import Sender
 from goldy.application.common.ports.catalog import (
     CartPrices,
     CatalogProjectionDao,
     CatalogQueryGateway,
     CatalogScope,
+    CatalogSnapshot,
     CategoryRow,
     PriceRow,
     PriceTypeBindingRow,
@@ -36,6 +51,8 @@ from goldy.application.common.query_params.catalog_filters import (
 from goldy.application.common.query_params.pagination import Pagination
 from goldy.application.common.query_params.search_term import SearchTerm
 from goldy.application.common.views.catalog import (
+    CatalogFinalizationResponse,
+    CatalogImportResponse,
     CategoryView,
     ProductListView,
     ProductSearchView,
@@ -273,3 +290,73 @@ class RecordingCatalogProjectionDao(CatalogProjectionDao):
     @override
     async def has_price_type(self, price_type_id: PriceTypeId) -> bool:
         return price_type_id.value in self.present_price_types
+
+
+@final
+class RecordingCatalogSender(Sender):
+    """Keeps every catalog command it was handed and answers as its handler would.
+
+    The answer carries the batch id and scope the command named and, for an
+    import, the number of rows the snapshot held, because the response body
+    is what the receiver serialises and a receiver test wants to see those
+    values come back through HTTP unchanged. ``swept`` is whatever a test set.
+
+    ``failure`` stands in for the one refusal a handler makes on its own —
+    ``CatalogSnapshotError`` after a sweep over price types — and for anything
+    else that fails below the receiver, so that the translation of each into
+    a status code can be exercised without a handler that actually fails.
+
+    Only the two catalog commands are answered. Anything else reaching this
+    stub is a receiver sending a command it was never meant to, which is worth
+    a loud ``TypeError`` rather than a made-up response.
+    """
+
+    def __init__(self) -> None:
+        self.requests: list[BaseRequest[object]] = []
+        self.failure: Exception | None = None
+        self.swept: int = 0
+
+    @override
+    async def send[TResponse](self, request: BaseRequest[TResponse]) -> TResponse:
+        self.requests.append(request)
+
+        if self.failure is not None:
+            raise self.failure
+
+        match request:
+            case ImportCatalogCommand(snapshot=snapshot):
+                return cast(
+                    "TResponse",
+                    CatalogImportResponse(
+                        batch_id=snapshot.batch_id,
+                        scope=describe_scope(snapshot.scope),
+                        accepted=_row_count(snapshot),
+                        discarded=0,
+                    ),
+                )
+            case FinalizeCatalogImportCommand(batch_id=batch_id, scope=scope):
+                return cast(
+                    "TResponse",
+                    CatalogFinalizationResponse(
+                        batch_id=batch_id,
+                        scope=describe_scope(scope),
+                        swept=self.swept,
+                    ),
+                )
+
+        msg = (
+            f"The catalog receiver sent {type(request).__name__}, which it never should."
+        )
+        raise TypeError(msg)
+
+
+def _row_count(snapshot: CatalogSnapshot) -> int:
+    """How many rows the snapshot carries across all six collections."""
+    return (
+        len(snapshot.categories)
+        + len(snapshot.products)
+        + len(snapshot.price_types)
+        + len(snapshot.prices)
+        + len(snapshot.stock)
+        + len(snapshot.price_type_bindings)
+    )

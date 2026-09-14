@@ -80,6 +80,21 @@ def catalog_env(**overrides: str) -> dict[str, str]:
     return {"GOLDY_DEFAULT_PRICE_TYPE_ID": "1c-price-type-wholesale"} | overrides
 
 
+def catalog_receiver_env(**overrides: str) -> dict[str, str]:
+    """Valid ``GOLDY_CATALOG_RECEIVER_*`` values; override any key.
+
+    Only the token is required by the config; the rest is here so a test can
+    break each one by name, and so the stub keeps mirroring every variable the
+    real factory maps.
+    """
+    return {
+        "GOLDY_CATALOG_RECEIVER_HOST": "127.0.0.1",
+        "GOLDY_CATALOG_RECEIVER_PORT": "8090",
+        "GOLDY_CATALOG_RECEIVER_TOKEN": "test-catalog-token-0123456789abcdefghij",
+        "GOLDY_CATALOG_RECEIVER_MAX_BODY_MIB": "64",
+    } | overrides
+
+
 def taskiq_env(**overrides: str) -> dict[str, str]:
     """Valid ``TASKIQ_*`` values; override any key."""
     return {

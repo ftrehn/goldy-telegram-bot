@@ -1,0 +1,140 @@
+# Production overlay for the Beget server, layered on top of docker-compose.yaml:
+#
+#   docker compose -f docker-compose.yaml -f docker-compose.prod.yml up -d --build
+#
+# The base file stays complete on its own and runs anywhere. This one records
+# only what a shared server changes, so the difference between "works on a
+# laptop" and "works on Beget" is readable in one screen.
+#
+# The receiver's port is not published. There is no firewall on the host and
+# Docker writes its own DNAT rules past ufw anyway, so a published port is an
+# open port — and the receiver speaks plain HTTP with a bearer token in the
+# header. The shared Caddy in /opt/edge terminates TLS instead and reaches the
+# receiver over the external "edge" network, where this service is announced as
+# goldy-receiver: the compose name "catalog-receiver" is generic enough to
+# collide with another project on the same network. Only the receiver joins
+# that network; the bot, the worker and the scheduler have nothing to offer a
+# proxy.
+#
+# What those three do need is the way out to Telegram. On this server it is
+# the Xray client in /opt/tunnel, container tg-proxy, which speaks SOCKS5 on
+# the external "tgproxy" network and carries everything to the Dutch server
+# inside a VLESS+Reality stream — the bot's TELEGRAM_PROXY_URL points at it.
+# The scheduler joins for symmetry only: it validates the same variable
+# because it builds the worker's container, and never dials Telegram.
+#
+# Log rotation is set per service. The json-file driver keeps everything by
+# default, and a bot that logs every update fills a disk in months, quietly.
+# The sizes follow the neighbouring analytics project: 10 MB × 2 for the quiet
+# ones, 20 MB × 3 as the norm, 50 MB × 5 for the worker, which is the
+# chattiest process here.
+#
+# Memory limits size the project for a 12 GB host it shares with two others.
+# They are ceilings, not reservations: a process that reaches its limit is
+# killed and restarted by its own restart policy, which beats the kernel
+# picking a victim across all three projects. Together they add up to under
+# 4 GB. The migrate service has no limit — it runs once, for seconds, and a
+# limit on it would only be one more way for a deploy to fail.
+#
+# The base file builds each application service from the same anchor, and a
+# YAML merge key replaces nested mappings wholesale — that is why the base
+# repeats the host entries under catalog-receiver. Compose merges an overlay
+# differently, key by key, so nothing here needs to repeat "environment", and
+# nothing here does.
+
+x-logging-quiet: &logging-quiet
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "2"
+
+x-logging-default: &logging-default
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+x-logging-verbose: &logging-verbose
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+services:
+  migrate:
+    logging: *logging-quiet
+
+  bot:
+    networks:
+      - default
+      - tgproxy
+    logging: *logging-default
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  worker:
+    networks:
+      - default
+      - tgproxy
+    logging: *logging-verbose
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  scheduler:
+    networks:
+      - default
+      - tgproxy
+    logging: *logging-quiet
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  catalog-receiver:
+    ports: !override []
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - goldy-receiver
+    logging: *logging-default
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  postgres:
+    logging: *logging-default
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  redis:
+    logging: *logging-quiet
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  rabbitmq:
+    logging: *logging-default
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+# Both created once on the server, outside any compose project:
+#   docker network create edge
+#   docker network create tgproxy
+# The shared Caddy and every service it proxies meet on edge; the Telegram
+# tunnel client and the processes that talk to Telegram meet on tgproxy.
+networks:
+  edge:
+    external: true
+  tgproxy:
+    external: true

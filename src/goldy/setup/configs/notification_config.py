@@ -18,8 +18,18 @@ class NotificationConfig:
     has to come from that bot; a second variable holding a copy of the same
     secret is a second thing to rotate and the one that gets forgotten.
 
+    The proxy is shared for the same reason as the token. The worker's client
+    reaches the same ``api.telegram.org`` the bot does, from the same data
+    centre, so a route that is unreliable for one is unreliable for the other;
+    a second variable would let a deployment proxy the bot and leave the
+    notifications to fail quietly on the direct route.
+
     Attributes:
         bot_token: The token from BotFather, the same one the bot answers with.
+        proxy_url: Where the worker's Bot API traffic leaves through, if not
+            directly — the same value the bot reads. ``None`` means the direct
+            route.
     """
 
     bot_token: str
+    proxy_url: str | None = None

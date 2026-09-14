@@ -31,9 +31,20 @@ class TelegramConfig:
             come back to a cart they started on Friday, short enough that the
             store does not fill with conversations nobody will resume. Redis
             storage only; memory storage dies with the process anyway.
+        proxy_url: Where the Bot API traffic leaves through, if not directly.
+            ``None`` means the process talks to ``api.telegram.org`` itself,
+            which is the right answer wherever Telegram is reachable. A
+            ``socks5://``, ``socks4://`` or ``http://`` URL — credentials
+            inside it if the proxy wants any — sends every request through
+            that host instead, for a data centre whose own route to Telegram
+            cannot be relied on. The loader checks the shape at startup, so a
+            typo stops the process rather than the first update; the value
+            carries a password, so it is masked in error output and never
+            logged whole.
     """
 
     bot_token: str
+    proxy_url: str | None = None
     use_redis_storage: bool = True
     use_redis_event_isolation: bool = True
     use_i18n_isolation: bool = True

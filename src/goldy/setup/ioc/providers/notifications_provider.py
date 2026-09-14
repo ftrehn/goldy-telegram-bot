@@ -26,6 +26,7 @@ from goldy.infrastructure.adapters.notifications.notification_locales_path impor
 from goldy.infrastructure.adapters.notifications.sqlalchemy_inbox_gateway import (
     SqlAlchemyInboxGateway,
 )
+from goldy.setup.bootstrap.setups.telegram_session_setup import make_telegram_session
 from goldy.setup.configs.notification_config import NotificationConfig
 
 
@@ -36,13 +37,19 @@ async def make_notifier_bot(
 
     A second ``Bot`` rather than the dispatcher's, because these are separate
     processes; what they share is the token, so the notification lands in the
-    conversation the customer already has with the shop.
+    conversation the customer already has with the shop. They share the proxy
+    too, built by the same factory the bot uses: a notification reaches
+    ``api.telegram.org`` over the same route as an update does, so the worker
+    must not be the process left on the direct one when the bot is not.
 
     A generator so the aiohttp session is closed on shutdown. Without it the
     worker leaves a connector open and asyncio complains at exit, which is the
     kind of noise that trains people to ignore shutdown logs.
     """
-    bot = Bot(token=notification_config.bot_token)
+    bot = Bot(
+        token=notification_config.bot_token,
+        session=make_telegram_session(notification_config.proxy_url),
+    )
     try:
         yield bot
     finally:

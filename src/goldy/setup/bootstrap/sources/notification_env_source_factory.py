@@ -10,12 +10,14 @@ if TYPE_CHECKING:
 
 
 class NotificationEnvSourceFactory(SourceFactory):
-    """Maps the bot token onto :class:`NotificationConfig`.
+    """Maps the bot token and the proxy onto :class:`NotificationConfig`.
 
-    The same variable the bot reads. Notifications are sent into the
+    The same variables the bot reads. Notifications are sent into the
     conversation the customer already has with the shop, so they must come from
     that account — and a deployment that had to set the token twice would
-    eventually set it twice differently.
+    eventually set it twice differently. The proxy follows the token: both
+    processes reach Telegram from the same place, so they leave through the
+    same door.
     """
 
     @override
@@ -23,5 +25,6 @@ class NotificationEnvSourceFactory(SourceFactory):
         return EnvSource(
             field_mapping={
                 F[NotificationConfig].bot_token: "TELEGRAM_BOT_TOKEN",
+                F[NotificationConfig].proxy_url: "TELEGRAM_PROXY_URL",
             },
         )

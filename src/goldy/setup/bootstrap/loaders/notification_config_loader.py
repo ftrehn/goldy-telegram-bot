@@ -3,6 +3,10 @@ from typing import TYPE_CHECKING, Final, override
 from dature import V, load
 
 from goldy.setup.bootstrap.loaders.loader import ConfigLoader
+from goldy.setup.bootstrap.loaders.telegram_proxy_url import (
+    TELEGRAM_PROXY_URL_ERROR,
+    is_telegram_proxy_url,
+)
 from goldy.setup.configs.notification_config import NotificationConfig
 
 if TYPE_CHECKING:
@@ -32,7 +36,7 @@ class NotificationConfigLoader(ConfigLoader[NotificationConfig]):
             self._source_factory.create(),
             schema=NotificationConfig,
             root_validators=self._root_validators(),
-            secret_field_names=("bot_token",),
+            secret_field_names=("bot_token", "proxy_url"),
         )
 
     @staticmethod
@@ -44,5 +48,9 @@ class NotificationConfigLoader(ConfigLoader[NotificationConfig]):
                     "TELEGRAM_BOT_TOKEN must look like '<bot_id>:<secret>' — the "
                     "worker sends notifications as the same bot"
                 ),
+            ),
+            V.root(
+                lambda c: is_telegram_proxy_url(c.proxy_url),
+                error_message=TELEGRAM_PROXY_URL_ERROR,
             ),
         )

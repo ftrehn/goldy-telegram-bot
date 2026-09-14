@@ -65,3 +65,50 @@ def test_the_token_is_masked_in_error_output() -> None:
         loader.load()
 
     assert "TOP-SECRET-VALUE" not in render_exception(excinfo.value)
+
+
+def test_the_notifier_leaves_through_the_same_proxy_as_the_bot() -> None:
+    """One route for both processes.
+
+    The worker's client reaches the same ``api.telegram.org`` the bot does,
+    from the same data centre. A proxy variable of its own would let a
+    deployment proxy the bot and leave the notifications failing quietly on
+    the direct route.
+    """
+    url = "socks5://user:pass@proxy.internal:1080"
+
+    config = NotificationConfigLoader(
+        notification_source_stub(TELEGRAM_PROXY_URL=url),
+    ).load()
+
+    assert config.proxy_url == url
+
+
+def test_the_notifier_talks_directly_when_no_proxy_is_set() -> None:
+    config = NotificationConfigLoader(notification_source_stub()).load()
+
+    assert config.proxy_url is None
+
+
+@pytest.mark.parametrize("url", ("proxy.internal:1080", "https://proxy.internal:3128"))
+def test_a_proxy_url_of_the_wrong_shape_is_refused_by_name(url: str) -> None:
+    loader = NotificationConfigLoader(notification_source_stub(TELEGRAM_PROXY_URL=url))
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "TELEGRAM_PROXY_URL" in render_exception(excinfo.value)
+
+
+def test_the_proxy_password_is_masked_in_error_output() -> None:
+    loader = NotificationConfigLoader(
+        notification_source_stub(
+            TELEGRAM_BOT_TOKEN="not-a-token",
+            TELEGRAM_PROXY_URL="socks5://user:TOP-SECRET-VALUE@proxy.internal:1080",
+        ),
+    )
+
+    with pytest.raises(DatureConfigError) as excinfo:
+        loader.load()
+
+    assert "TOP-SECRET-VALUE" not in render_exception(excinfo.value)

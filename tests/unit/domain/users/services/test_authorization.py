@@ -1,6 +1,5 @@
 import pytest
 
-from goldy.domain.users.entities.user import User
 from goldy.domain.users.errors import AuthorizationError
 from goldy.domain.users.services.access_service import AccessService
 from goldy.domain.users.services.authorization.composite import AllOf, AnyOf
@@ -14,8 +13,7 @@ from goldy.domain.users.services.authorization.permission import (
     UserManagementContext,
 )
 from goldy.domain.users.values.user_role import UserRole
-
-type People = dict[UserRole, User]
+from tests.unit.support import People
 
 
 @pytest.mark.parametrize(

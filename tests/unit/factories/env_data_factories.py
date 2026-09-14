@@ -74,6 +74,11 @@ def admin_env(**overrides: str) -> dict[str, str]:
     return {"GOLDY_ADMIN_PHONE_NUMBERS": ""} | overrides
 
 
+def catalog_env(**overrides: str) -> dict[str, str]:
+    """Valid ``GOLDY_DEFAULT_PRICE_TYPE_ID`` value; override it to break it."""
+    return {"GOLDY_DEFAULT_PRICE_TYPE_ID": "1c-price-type-wholesale"} | overrides
+
+
 def taskiq_env(**overrides: str) -> dict[str, str]:
     """Valid ``TASKIQ_*`` values; override any key."""
     return {

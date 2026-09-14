@@ -29,6 +29,8 @@ tests/
 .claude/
 .codex/
 docker-compose.yaml
+docker-compose.*.yml
+Dockerfile
 deploy/
 *.md
 !README.md

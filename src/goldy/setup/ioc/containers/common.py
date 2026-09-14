@@ -12,6 +12,7 @@ from goldy.setup.ioc.providers import (
     mediator_provider,
     pipelines_provider,
     services_provider,
+    shop_handlers_provider,
     user_handlers_provider,
 )
 
@@ -45,8 +46,14 @@ def interactive_providers() -> Iterable[Provider]:
     Everything here leads back to ``IdentityProvider``, which only exists while
     an update from a real account is being handled. Shared by Telegram and, in
     time, MAX — the two differ only in how they answer "who is writing".
+
+    The storefront is a separate group from the user one for readability alone;
+    both need the same thing, and neither may move into the core. A catalog
+    query looks harmless enough to put there and is not: it resolves the price
+    list of whoever is asking, so it cannot answer at all without a person.
     """
     return (
         services_provider(),
         user_handlers_provider(),
+        shop_handlers_provider(),
     )

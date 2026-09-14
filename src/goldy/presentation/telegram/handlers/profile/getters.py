@@ -2,6 +2,7 @@ from typing import Any
 
 from goldy.application.common.views.user import UserView
 from goldy.domain.users.values.locale import SUPPORTED_LOCALES
+from goldy.presentation.telegram.common.formatting import for_message_text
 
 
 async def profile_getter(user: UserView, **_kwargs: Any) -> dict[str, Any]:
@@ -11,6 +12,12 @@ async def profile_getter(user: UserView, **_kwargs: Any) -> dict[str, Any]:
     every getter — the auth gate reloaded it for this update, so a rename two
     screens ago is already visible. Caching it in ``dialog_data`` when the
     dialog opened would show the old name instead.
+
+    The name is quoted because a person may call themselves anything and this
+    screen prints it inside a message sent as HTML; ``FullName`` restricts the
+    length and nothing else, and the first name is taken from Telegram at
+    registration, where it is whatever its owner typed. See
+    :func:`for_message_text`.
     """
     full_name = (
         user.first_name
@@ -19,7 +26,7 @@ async def profile_getter(user: UserView, **_kwargs: Any) -> dict[str, Any]:
     )
 
     return {
-        "name": full_name,
+        "name": for_message_text(full_name),
         "phone": user.phone_number,
         "role": user.role,
         "locale": user.locale,

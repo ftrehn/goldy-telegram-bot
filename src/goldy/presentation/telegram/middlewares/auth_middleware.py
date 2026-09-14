@@ -45,9 +45,13 @@ class AuthMiddleware(BaseMiddleware):
     without anybody remembering to cover it, which is the whole reason this is a
     middleware and not a filter.
 
-    Blocked people are stopped in the same place. The aggregate refuses them
-    too, but only once a command reaches it — and by then they have already been
-    shown a menu they cannot use.
+    Blocked people are stopped in the same place, and this is the only place
+    that stops them: ``User.ensure_active`` exists on the aggregate but nothing
+    in the application layer calls it, so an update that got past this gate
+    would be served. Enforcing it here rather than in fifteen handlers is the
+    decision; the cost is that a second front end has to repeat the gate, which
+    is why it lives in a middleware every router inherits rather than in a
+    filter somebody has to remember.
 
     Resolving the user twice, through ``IdentityProvider`` and then the query
     gateway, is deliberate: the first is the port every layer already uses to

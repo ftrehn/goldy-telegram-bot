@@ -6,6 +6,9 @@ from goldy.setup.bootstrap.sources.admin_env_source_factory import (
 from goldy.setup.bootstrap.sources.alchemy_env_source_factory import (
     SQLAlchemyEnvSourceFactory,
 )
+from goldy.setup.bootstrap.sources.catalog_env_source_factory import (
+    CatalogEnvSourceFactory,
+)
 from goldy.setup.bootstrap.sources.postgres_env_source_factory import (
     PostgresEnvSourceFactory,
 )
@@ -23,6 +26,7 @@ from goldy.setup.bootstrap.sources.telegram_env_source_factory import (
 )
 from tests.unit.factories.env_data_factories import (
     admin_env,
+    catalog_env,
     postgres_env,
     rabbitmq_env,
     redis_env,
@@ -83,4 +87,12 @@ def admin_source_stub(**overrides: str) -> StubSourceFactory:
     return StubSourceFactory.mirroring(
         AdminEnvSourceFactory(),
         admin_env(**overrides),
+    )
+
+
+def catalog_source_stub(**overrides: str) -> StubSourceFactory:
+    """In-memory stub serving a valid default price type; override any key."""
+    return StubSourceFactory.mirroring(
+        CatalogEnvSourceFactory(),
+        catalog_env(**overrides),
     )

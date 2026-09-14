@@ -4,6 +4,7 @@ from dishka import Provider, Scope
 
 from goldy.setup.configs.admin_config import AdminConfig
 from goldy.setup.configs.alchemy_config import SQLAlchemyConfig
+from goldy.setup.configs.catalog_config import CatalogConfig
 from goldy.setup.configs.postgres_config import PostgresConfig
 from goldy.setup.configs.rabbitmq_config import RabbitMQConfig
 from goldy.setup.configs.redis_config import RedisConfig
@@ -28,4 +29,5 @@ def configs_provider() -> Provider:
     provider.from_context(provides=RabbitMQConfig)
     provider.from_context(provides=TaskIQConfig)
     provider.from_context(provides=AdminConfig)
+    provider.from_context(provides=CatalogConfig)
     return provider

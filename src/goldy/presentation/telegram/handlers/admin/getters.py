@@ -10,6 +10,7 @@ from goldy.application.common.views.user import UserView
 from goldy.application.queries.users.get_user_by_id.query import GetUserByIdQuery
 from goldy.application.queries.users.list_users.query import ListUsersQuery
 from goldy.domain.users.values.user_role import UserRole
+from goldy.presentation.telegram.common.formatting import for_message_text
 
 PAGE_SIZE: Final[int] = 8
 
@@ -68,15 +69,7 @@ async def user_card_getter(
     """
     user = await sender.send(GetUserByIdQuery(user_id=selected_user_id(dialog_manager)))
 
-    return {
-        "name": _label(user),
-        "phone": user.phone_number,
-        "role": user.role,
-        "status": user.status,
-        "locale": user.locale,
-        "reason": user.block_reason or "",
-        "is_blocked": user.is_blocked,
-    }
+    return card_arguments(user)
 
 
 async def roles_getter(**_kwargs: Any) -> dict[str, Any]:
@@ -90,6 +83,29 @@ async def roles_getter(**_kwargs: Any) -> dict[str, Any]:
         "roles": [
             (role.value, role.value) for role in (UserRole.CUSTOMER, UserRole.MANAGER)
         ],
+    }
+
+
+def card_arguments(user: UserView) -> dict[str, Any]:
+    """The card of one person, with the two free-text fields quoted.
+
+    The name is somebody's own and the reason is a sentence a manager typed,
+    and both land inside a message the bot sends as HTML — see
+    :func:`for_message_text` for what that costs when they are not quoted. The
+    list on the previous screen prints the same name onto a button and must
+    therefore *not* quote it, which is why the two are built separately rather
+    than by one function used twice.
+
+    Separated from the getter so it can be asserted without a container.
+    """
+    return {
+        "name": for_message_text(_label(user)),
+        "phone": user.phone_number,
+        "role": user.role,
+        "status": user.status,
+        "locale": user.locale,
+        "reason": for_message_text(user.block_reason or ""),
+        "is_blocked": user.is_blocked,
     }
 
 

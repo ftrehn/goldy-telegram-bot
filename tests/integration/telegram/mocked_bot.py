@@ -10,7 +10,7 @@ combines the *returned* message into the dialog window, reading
 Queueing a result per call through ``add_result_for`` would work and would be
 unreadable — showing one dialog window is a ``deleteMessage`` and a
 ``sendMessage`` whose order depends on whether the window carries a reply
-keyboard, and a test would fail on a mis-sized queue rather than on behaviour.
+keyboard, and a test would fail on a wrongly sized queue rather than on behaviour.
 
 So the session answers by method instead: a message where Telegram returns a
 message, ``True`` where it returns a flag, and a loud refusal for anything this

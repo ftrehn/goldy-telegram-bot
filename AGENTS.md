@@ -20,6 +20,7 @@ src/goldy/
   telegram_bot.py  bot entry point
   worker_app.py    taskiq worker entry point
   scheduler_app.py taskiq scheduler entry point
+  catalog_seed_app.py  catalog seeder entry point — a JSON snapshot, no messenger
 tests/
   unit/            domain + application + our own infrastructure logic
   integration/     anything crossing a process boundary
@@ -59,6 +60,7 @@ rejected alternatives were rejected.
 ```
 domain/
   common/          Entity, Aggregate, ValueObject, Event, BaseDomainService
+    values/        Money, Currency, Quantity — values no single aggregate owns
   users/
     entities/      User (aggregate), MessengerAccount
     values/        ValueObject subclasses and the NewType ids
@@ -68,7 +70,43 @@ domain/
     registration.py  parameter object for User.register
     errors.py
     events.py
+  catalog/
+    values/        SourceId and its subclasses, Sku, ProductName,
+                   UnitOfMeasure, PricedProduct
+    errors.py      no entities and no aggregate — see below
+  carts/
+    entities/      Cart (aggregate), CartLine
+    values/, factories/, ports/, errors.py, events.py
+  orders/
+    entities/      Order (aggregate), OrderLine
+    values/, ports/, errors.py, events.py
+    services/      CheckoutService and authorization/ (IsOrderOwner, CanManageOrders)
+    checkout.py    parameter object for CheckoutService.checkout
+    placement.py   parameter object for Order.place
+    status_transitions.py  the lifecycle table
 ```
+
+**`catalog` has no aggregate on purpose.** The catalog is a read-only
+projection of 1C; the bot never creates, changes or deletes a product, so there
+is no invariant for an aggregate to protect. What lives here is the handful of
+values an order has to keep as a snapshot, and a `ProductId` the domain reads
+but never mints — which is why this package has no id generator and must not
+grow one.
+
+**Domain packages depend in one direction only**: `catalog ← users ← carts ←
+orders`. `orders` reaching into `carts` (checkout starts from one) and into
+`users` (`UserId`, `FullName`, `PhoneNumber`) is the direction that is allowed;
+nothing in `users` or `carts` may import `orders`. This is **enforced** by the
+`domain_package_layers` contract, so a cycle fails the build rather than
+waiting for somebody to notice it.
+
+Owning an order is therefore a `Permission` like every other access rule, and
+not a method on the aggregate. `OrderAccessContext` lives in
+`domain/orders/services/authorization/` and carries `order_customer_id: UserId`
+rather than an `Order`, so nothing in `users` learns about orders and no cycle
+appears. One mechanism only — with ownership half method and half
+specification, `AnyOf(IsOrderOwner(), CanManageOrders())` could not be written
+at all.
 
 Where behaviour goes:
 
@@ -87,9 +125,11 @@ Value objects inherit `ValueObject` and implement `_validate()` with
 `@override`. They never override `__post_init__`.
 
 **Value objects are keyword-only** — except those stored as a SQLAlchemy
-`composite`, which the ORM rebuilds positionally. Today that is `FullName` and
-`UserPreferences`. Do not add `kw_only=True` to those without changing the
-mapping.
+`composite`, which the ORM rebuilds positionally. Today that is `FullName`,
+`UserPreferences`, `Money`, `Recipient` and `UnitOfMeasure`. Do not add
+`kw_only=True` to those without changing the mapping; each one says so in its
+own docstring, and `test_money_is_built_positionally` and
+`test_a_unit_of_measure_is_built_positionally` pin the positional call down.
 
 ## Authorization
 
@@ -106,7 +146,9 @@ target.block(reason)
 `SUBORDINATE_ROLES` is the single source of truth for who may act on whom. Two
 rules fall out of it for free, because nobody is their own subordinate: an
 administrator cannot touch another administrator, and nobody can block
-themselves. Do not re-state either as a separate check.
+themselves. Do not re-state either as a separate check. `STAFF_ROLES` beside
+it is the one statement of who works the shop — `User.is_staff`, the staff
+filter and the worker's "who hears about a new order" all read it.
 
 `ADMIN` appears in no one's subordinate set, so **the role cannot be granted
 through the bot at all**. The first administrators come from
@@ -122,7 +164,8 @@ application/
   common/
     mediator/      RequestHandler, PipelineHandler, markers, Sender
     ports/         every interface the infrastructure implements
-    services/      UserProvider
+    services/      UserProvider, CartProvider, PriceTypeResolver,
+                   CartPricingService, NotificationRecipientResolver
     views/         read models returned to presentation
     query_params/  Pagination, SortingOrder, UserFilters
   pipelines/       TransactionPipeline, EventsPipeline
@@ -140,13 +183,25 @@ Handlers:
 Gateways, not repositories. `UserCommandGateway` hands back whole aggregates;
 `UserQueryGateway` returns views and never aggregates. The query gateway is a
 DAO and a `Protocol` on purpose — a caching decorator over it is invisible to
-every handler.
+every handler. The name says the shape: a *gateway* is thin — read, add — and
+hands aggregates in and out; a port that takes batches, upserts conditionally
+and sweeps is a *DAO* (`CatalogProjectionDao`); a port that reads with the
+intent to write into an order is a *reader* returning domain values
+(`PricingReader`), never views.
 
-Two rules **cannot** be enforced in the domain: that a phone number belongs to
-one user, and that a messenger account does too. Both span aggregates and any
-check-by-reading loses to a concurrent registration. Unique indexes hold them,
-`SqlAlchemyUserCommandGateway.add` flushes so the clash surfaces as
-`UserAlreadyExistsError`, and the caller retries once.
+Whether a person who has no cart gets one is an application decision, not a
+storage one: `CartProvider.current_or_new()` reads, creates through the
+factory and adds, and answers a lost race by reading the cart that won. The
+gateway only reports the clash. The price list is resolved the same visible
+way — `PriceTypeResolver.resolve_for(user_id)` with the id the handler took
+from `IdentityProvider`; there is no hidden context a price comes from.
+
+Three rules **cannot** be enforced in the domain: that a phone number belongs
+to one user, that a messenger account does too, and that a person has one
+cart. All span aggregates and any check-by-reading loses to a concurrent
+request. Unique indexes hold them, the command gateways flush so the clash
+surfaces as `UserAlreadyExistsError` or `CartAlreadyExistsError`, and the
+caller decides — a retry for registration, the winner's cart for a cart.
 
 ## Pipelines and the mediator
 
@@ -173,7 +228,32 @@ to the outbox table **in the same transaction**. The scheduler fires
 `RelayOutboxCommand`; the worker publishes to a RabbitMQ topic exchange.
 
 Delivery is at-least-once, so consumers must be idempotent — they key off
-`OutboxMessage.id`, which is stable across retries.
+`OutboxMessage.id`, which is stable across retries. That key is enforced by the
+`inbox_messages` table: `InboxGateway.claim` is one plain `INSERT` inside a
+savepoint, refused by the primary key for a message seen before, and the row
+commits in the same transaction as whatever the message caused. A handler that
+raises gives the claim back and the message is redelivered; a handler that
+decides there is nothing to do keeps it, because the answer will not be
+different next time. The notification commands carry `event_type` for the
+claim, taken by the subscriber from the routing key the message arrived under.
+
+The consumer side lives in `infrastructure/task_manager/consumers/`, which
+`.importlinter` already allows to reach into `application.commands`. They are
+ordinary FastStream subscribers on a `RabbitRouter`: the body is parsed into
+the event by its annotation, `Sender` arrives through `dishka_faststream`'s
+`FromDishka`, and a body that does not parse is logged and acknowledged by the
+router's `ExceptionMiddleware`. One durable queue per event, bound by routing
+key — the event's class name — so one poisoned message cannot hold up a
+different kind of message behind it.
+
+Notifications are typed. A handler builds an `OrderPlacedNotification` or one
+of its siblings from `application/common/ports/notifications/notification.py`;
+the Fluent adapter owns the message keys and turns the object into text. A
+sender raises `NotificationUndeliverableError` for an account closed to us and
+the dispatcher counts that person as skipped; a recipient on a messenger this
+worker has no sender for is `NotificationChannelUnavailableError`, loud on
+purpose, because it is a deployment that lets people choose a channel nobody
+serves.
 
 Events carry primitives, not value objects: they are serialised, and their
 `event_id` / `event_date` are stamped at construction because the outbox row is
@@ -184,9 +264,16 @@ keyed and ordered by them.
 - **Postgres** + SQLAlchemy asyncio + asyncpg, **imperative mapping**
   (`persistence/models/`). The domain knows nothing about the ORM.
 - **taskiq** over RabbitMQ (`taskiq-aio-pika`), Redis result backend.
-- **FastStream** for publishing domain events — publisher only, no consumers.
-- **dishka** for DI, **aiogram** + **aiogram-dialog** for Telegram.
-- **adaptix** for aggregate → view mapping.
+- **FastStream** over RabbitMQ for domain events — the relay publishes to the
+  `domain_events` topic exchange, and the notification consumers in
+  `infrastructure/task_manager/consumers/` bind to it. The worker process is
+  both ends, which is why it **starts** the event broker rather than only
+  connecting it: a subscriber registered on a merely connected broker never
+  consumes anything.
+- **dishka** for DI, **aiogram** + **aiogram-dialog** for Telegram,
+  **dishka-faststream** for the worker's subscribers.
+- **adaptix** for aggregate → view mapping and for reading the catalog
+  snapshot off a decoded JSON document (`AdaptixCatalogSnapshotMapper`).
 
 Value objects reach the database through `TypeDecorator`s in
 `persistence/models/types.py`. Multi-field value objects are a `composite`.
@@ -213,7 +300,8 @@ assembled per process** in `setup/ioc/containers/`:
 | Container | Gets |
 |---|---|
 | `make_telegram_container` | core + interactive + Telegram + aiogram |
-| `make_worker_container` | core + task manager + outbox handlers + taskiq |
+| `make_worker_container` | core + task manager + outbox handlers + notifications + taskiq |
+| `make_catalog_seed_container` | core + the catalog source, and nothing that expects a person |
 
 Handlers are grouped by **what they need**, not who calls them. Anything needing
 an `IdentityProvider` is in `user_handlers_provider`, which the worker does not
@@ -221,6 +309,12 @@ get — a background task is nobody's request. dishka validates the whole graph
 when a container is built, so a handler in the wrong group fails at startup
 rather than halfway through a task. This has already caught two real mistakes;
 do not merge the groups to make a wiring error go away.
+
+`notifications_provider` is the same rule applied to a secret rather than to an
+identity. It carries the Bot API client and the token behind it, and only the
+worker gets it: the bot answers whoever wrote to it, while the worker writes to
+people who did not. `configs_provider` still hands `TelegramConfig` and
+`NotificationConfig` to nobody — each process contributes its own.
 
 MAX will be a fourth container over the same core, differing only in how it
 answers "who is writing".
@@ -275,6 +369,14 @@ aiogram-dialog. Dialog getters take what they need from the middleware data as
 parameters — `user: UserView` works, because aiogram-dialog passes the update
 data in.
 
+Use the widgets the library has before writing one. Closing a dialog is
+`Cancel()`, not a callback that calls `manager.done()`. A paged list is a
+`StubScroll` holding the page plus `PrevPage`/`NextPage` bound to it, wired by
+`common/paging.py`; the getter reads the page through
+`manager.find(scroll_id).get_page()` and puts the page count under `pages`
+for the scroll to read. What is ours there is the arithmetic and the hiding of
+the buttons at the edges, nothing more.
+
 ## Testing rules (mandatory)
 
 - Tests mirror `src/` structure, under `unit/` and `integration/`.
@@ -316,6 +418,10 @@ Conventions this project insists on:
   explaining, explain it where the thing is defined.
 
 ```sh
+just bot               # the three processes and the seeder, with .env loaded
+just worker            # (just bot .env.dev.example for another file)
+just scheduler
+just seed docs/design/catalog-snapshot.example.json
 just lint              # ruff format + ruff check + codespell
 just mypy              # type check
 just static-analysis   # mypy + bandit + semgrep + import-linter
@@ -388,6 +494,12 @@ Read the relevant entry before touching that area.
 - **`callback_query.message` may be an `InaccessibleMessage`.** Answer the
   callback instead of writing into it; `common/replying.py` does this in one
   place for everybody.
+- **A Fluent placeholder with no argument does not render as text.** It raises.
+  `notification-order-status-changed` missing its `$status` produces no message
+  at all and one line in a log, so notification texts are verified by *rendering*
+  every key with the arguments its handler builds — see
+  `tests/unit/infrastructure/adapters/notifications/`. Read `.ftl` files by eye
+  and you will ship a message nobody receives.
 - **The locales directory must not be a Python package.** An `__init__.py` puts
   a `__pycache__` beside the languages, and the Fluent core reads that as a
   locale and then fails to find any `.ftl` in it.

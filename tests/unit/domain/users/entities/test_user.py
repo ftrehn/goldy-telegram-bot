@@ -22,7 +22,7 @@ from tests.unit.factories.domain_factories import (
     make_full_name,
     make_registered_user,
 )
-from tests.unit.support import emitted_event_names
+from tests.unit.support import drain, emitted_event_names
 
 
 def test_a_registered_user_arrives_with_the_account_they_wrote_from() -> None:
@@ -243,9 +243,21 @@ def test_only_managers_and_admins_are_staff(role: UserRole, *, staff: bool) -> N
     assert user.is_staff is staff
 
 
+def test_promoting_a_customer_to_staff_is_announced() -> None:
+    """The role is what the staff filters read, so a change of it is a fact."""
+    user, collection = make_registered_user()
+    drain(collection)
+
+    user.assign_role(UserRole.MANAGER)
+
+    assert user.role is UserRole.MANAGER
+    assert user.is_staff is True
+    assert emitted_event_names(collection) == ["UserRoleChanged"]
+
+
 def test_assigning_the_role_someone_already_has_records_nothing() -> None:
     user, collection = make_registered_user()
-    emitted_event_names(collection)
+    drain(collection)
 
     user.assign_role(UserRole.CUSTOMER)
 

@@ -86,6 +86,30 @@ test-ci:
 [group("tests")]
 ci: linter static-analysis test-ci
 
+# Processes. `env` is the file whose variables the process starts with: goldy
+# reads the OS environment and nothing else, so the file is loaded here through
+# python-dotenv the same way the migration recipes load it. Works on Windows and
+# Linux alike, which is why there is no shell script beside this file.
+[doc("Run the Telegram bot (usage: just bot [.env.dev.example])")]
+[group("run")]
+bot env=".env":
+  uv run --active --frozen dotenv -f {{env}} run -- python -m goldy.telegram_bot
+
+[doc("Run the taskiq worker")]
+[group("run")]
+worker env=".env":
+  uv run --active --frozen dotenv -f {{env}} run -- taskiq worker goldy.worker_app:create_worker_taskiq_app
+
+[doc("Run the taskiq scheduler")]
+[group("run")]
+scheduler env=".env":
+  uv run --active --frozen dotenv -f {{env}} run -- taskiq scheduler goldy.scheduler_app:create_scheduler_taskiq_app
+
+[doc("Seed the catalog from a JSON snapshot (usage: just seed docs/design/catalog-snapshot.example.json)")]
+[group("run")]
+seed file env=".env":
+  uv run --active --frozen dotenv -f {{env}} run -- python -m goldy.catalog_seed_app --file {{file}}
+
 # Docker
 [doc("Build the production image")]
 [group("docker")]

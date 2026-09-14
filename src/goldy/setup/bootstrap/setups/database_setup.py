@@ -1,4 +1,6 @@
 from goldy.infrastructure.persistence.models import (
+    map_carts_table,
+    map_orders_table,
     map_outbox_table,
     map_users_table,
 )
@@ -30,3 +32,5 @@ def setup_map_tables() -> None:
     """
     map_outbox_table()
     map_users_table()
+    map_carts_table()
+    map_orders_table()

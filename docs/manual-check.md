@@ -332,8 +332,19 @@
 
 Подготовка та же, что в начале документа: сервисы подняты, миграции накатаны,
 `.env` скопирован из `.env.dev.example`. В нём уже есть блок
-`GOLDY_CATALOG_RECEIVER_*` с токеном-заглушкой длиной больше 32 символов —
-именно он используется в командах ниже. Запустите приёмник в отдельном окне:
+`GOLDY_CATALOG_RECEIVER_*` с токеном-заглушкой длиной больше 32 символов.
+Команды ниже берут токен из переменной оболочки с тем же именем, а не из
+текста документа: строка `Authorization: Bearer <значение>` в репозитории
+выглядит для сканера секретов как утечка, и CI на ней падает. Поэтому перед
+шагом 17 один раз выполните в том же окне, где будете звать `curl`:
+
+```sh
+export GOLDY_CATALOG_RECEIVER_TOKEN="$(grep '^GOLDY_CATALOG_RECEIVER_TOKEN=' .env | cut -d= -f2-)"
+```
+
+В PowerShell то же самое — `$env:GOLDY_CATALOG_RECEIVER_TOKEN = "<значение из
+.env>"`, и в командах переменная пишется как `$env:GOLDY_CATALOG_RECEIVER_TOKEN`.
+Запустите приёмник в отдельном окне:
 `just receiver`. В консоли должна появиться строка с адресом, на котором он
 слушает, — `127.0.0.1:8090`, если ничего не меняли. Если процесс упал на старте
 с именем переменной в тексте ошибки, значит токен короче 32 символов или порт
@@ -354,7 +365,7 @@ curl -i http://127.0.0.1:8090/catalog/ping
 ### 17. Связь
 
 ```sh
-curl -i -H "Authorization: Bearer dev-catalog-token-change-me-0123456789" \
+curl -i -H "Authorization: Bearer $GOLDY_CATALOG_RECEIVER_TOKEN" \
   http://127.0.0.1:8090/catalog/ping
 ```
 
@@ -368,7 +379,7 @@ curl -i -H "Authorization: Bearer dev-catalog-token-change-me-0123456789" \
 
 ```sh
 curl -i -X POST \
-  -H "Authorization: Bearer dev-catalog-token-change-me-0123456789" \
+  -H "Authorization: Bearer $GOLDY_CATALOG_RECEIVER_TOKEN" \
   -H "Content-Type: application/json" \
   --data-binary @docs/design/catalog-snapshot.example.json \
   http://127.0.0.1:8090/catalog/batches
@@ -397,7 +408,7 @@ curl -i -X POST \
 
 ```sh
 curl -i -X POST \
-  -H "Authorization: Bearer dev-catalog-token-change-me-0123456789" \
+  -H "Authorization: Bearer $GOLDY_CATALOG_RECEIVER_TOKEN" \
   -H "Content-Type: application/json" \
   --data-binary "{\"scope\": {\"kind\": \"products\"}}" \
   http://127.0.0.1:8090/catalog/batches/seed-2026-09-11-01/finalize

@@ -43,4 +43,8 @@ class TelegramConfigLoader(ConfigLoader[TelegramConfig]):
                     f"{', '.join(sorted(SUPPORTED_LOCALES))}"
                 ),
             ),
+            V.root(
+                lambda c: c.fsm_ttl_seconds > 0,
+                error_message="TELEGRAM_FSM_TTL_SECONDS must be a positive number",
+            ),
         )

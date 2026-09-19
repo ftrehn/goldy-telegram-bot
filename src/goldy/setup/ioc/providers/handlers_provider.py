@@ -22,6 +22,7 @@ from goldy.application.commands.carts.remove_cart_line.handler import (
 from goldy.application.commands.carts.remove_unavailable_cart_lines.handler import (
     RemoveUnavailableCartLinesHandler,
 )
+from goldy.application.commands.carts.repeat_order.handler import RepeatOrderHandler
 from goldy.application.commands.carts.set_cart_line_quantity.handler import (
     SetCartLineQuantityHandler,
 )
@@ -167,6 +168,7 @@ def shop_handlers_provider() -> Provider:
         RemoveCartLineHandler,
         RemoveUnavailableCartLinesHandler,
         ClearCartHandler,
+        RepeatOrderHandler,
         PlaceOrderHandler,
         CancelOrderHandler,
         ChangeOrderStatusHandler,

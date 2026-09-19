@@ -25,6 +25,12 @@ class TelegramConfig:
         drop_pending_updates: Whether to discard updates that queued up while
             the bot was down. On by default — an order placed twenty minutes ago
             and answered now is worse than one silently lost.
+        fsm_ttl_seconds: How long an abandoned dialogue and everything it kept
+            — a half-typed address, a deep link waiting for a registration —
+            stay in Redis. Seven days by default: long enough for somebody to
+            come back to a cart they started on Friday, short enough that the
+            store does not fill with conversations nobody will resume. Redis
+            storage only; memory storage dies with the process anyway.
     """
 
     bot_token: str
@@ -33,3 +39,4 @@ class TelegramConfig:
     use_i18n_isolation: bool = True
     default_locale: str = DEFAULT_LOCALE
     drop_pending_updates: bool = True
+    fsm_ttl_seconds: int = 7 * 24 * 60 * 60

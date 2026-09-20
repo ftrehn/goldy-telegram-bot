@@ -752,16 +752,16 @@ pydantic = [
 
 [[package]]
 name = "faststream"
-version = "0.7.3"
+version = "0.7.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
     { name = "fast-depends", extra = ["pydantic"] },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8d/fc/1e817ff0c5fe4bf992473b5179e3e5e892624fb68cf91eeabc20dcbdc2bb/faststream-0.7.3.tar.gz", hash = "sha256:f53015a6eedd11bfecf31ce63d7d650eb19c4ee7a009c3e0583392674fb67535", size = 333766, upload-time = "2026-07-28T20:47:57.442Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9b/0c/2b233cb66e8f776de24d8aa0f8fd0055fdeea65bff6daa902cb95f46e103/faststream-0.7.5.tar.gz", hash = "sha256:a8185385e4fe64f2f0420c8cd38a55a183f4599e5343b77bf16abc9f62ccaadf", size = 340955, upload-time = "2026-08-27T08:54:16.298Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/cc/f4deb57be7349adc0f0e8a133e937b13bac2737fcbaaae5353bba48d8df3/faststream-0.7.3-py3-none-any.whl", hash = "sha256:10e6b5cf46aea1fe0be0112b99607c85b6bd56f8e448ebb68e8c56cad165a325", size = 561336, upload-time = "2026-07-28T20:47:55.861Z" },
+    { url = "https://files.pythonhosted.org/packages/56/45/4f96ecafb94707364e283defca94798b47484d69bb77c15175592673568d/faststream-0.7.5-py3-none-any.whl", hash = "sha256:27d1bb3a2945cbd914b326d9b78d3e51d6678293835562be962a8a2189abe20b", size = 569912, upload-time = "2026-08-27T08:54:14.739Z" },
 ]
 
 [package.optional-dependencies]
@@ -935,7 +935,7 @@ requires-dist = [
     { name = "dature", specifier = "==1.3.0" },
     { name = "dishka", specifier = "==1.10.1" },
     { name = "dishka-faststream", specifier = ">=0.7.0" },
-    { name = "faststream", extras = ["rabbit"], specifier = ">=0.7.3" },
+    { name = "faststream", extras = ["rabbit"], specifier = ">=0.7.5" },
     { name = "fluent-runtime", specifier = ">=0.4.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.0.52" },
     { name = "structlog", specifier = "==26.1.0" },

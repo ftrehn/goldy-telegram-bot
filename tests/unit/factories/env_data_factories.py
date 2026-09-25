@@ -94,3 +94,14 @@ def taskiq_env(**overrides: str) -> dict[str, str]:
         "TASKIQ_USE_DELAY_EXPONENT": "true",
         "TASKIQ_MAX_DELAY_EXPONENT": "60.0",
     } | overrides
+
+
+def site_api_env(**overrides: str) -> dict[str, str]:
+    """Valid ``GOLDY_SITE_API_*`` values and the sync schedule; override any key."""
+    return {
+        "GOLDY_SITE_API_URL": "https://tkgoldy.ru/api/v1",
+        "GOLDY_SITE_API_TOKEN": "tkg_3f9a0c1e_FakeTokenForTestsOnly",
+        "GOLDY_SITE_API_TIMEOUT": "30",
+        "GOLDY_SITE_API_PAGE_SIZE": "500",
+        "GOLDY_CATALOG_SYNC_CRON": "*/15 * * * *",
+    } | overrides

@@ -17,7 +17,8 @@ Docker с плагином compose и больше ничего. Python, uv и j
 git clone <репозиторий> goldy && cd goldy
 cp .env.example .env
 # заполнить: TELEGRAM_BOT_TOKEN, POSTGRES_PASSWORD, RABBITMQ_USER, RABBITMQ_PASSWORD,
-# GOLDY_DEFAULT_PRICE_TYPE_ID, GOLDY_ADMIN_PHONE_NUMBERS
+# GOLDY_DEFAULT_PRICE_TYPE_ID=BASE, GOLDY_SITE_API_URL, GOLDY_SITE_API_TOKEN,
+# GOLDY_ADMIN_PHONE_NUMBERS
 docker compose up -d --build
 ```
 
@@ -25,7 +26,11 @@ docker compose up -d --build
 процесса ждут его завершения. Запускать `alembic upgrade head` из точки входа бота
 нельзя: три процесса на каждом рестарте гонялись бы за одним замком.
 
-Каталог до появления обмена с 1С наполняется снимком:
+Каталог наполняет воркер: раз в `GOLDY_CATALOG_SYNC_CRON` он забирает его с сайта
+tkgoldy.ru по HTTP API — сайт единственный мост к 1С, с самой 1С бот не говорит
+([ADR-0004](../docs/adr/0004-site-is-the-only-bridge-to-1c.md)). Первый проход
+случится на ближайшем тике расписания. Без доступа к сайту проекцию можно
+наполнить снимком:
 
 ```sh
 docker compose run --rm bot python -m goldy.catalog_seed_app --file snapshot.json
@@ -51,9 +56,9 @@ compose ps` показывает `bot`, `worker` и `scheduler` в состоя�
 
 ## Чего здесь сознательно нет
 
-Обратного прокси и TLS: бот работает на long polling и сам ходит к Telegram, входящих
-соединений у него нет. Публичный адрес понадобится только когда приедет обмен с 1С,
-и тогда открывать надо будет приёмник обмена, а не бота.
+Обратного прокси и TLS: бот работает на long polling и сам ходит к Telegram и к сайту,
+входящих соединений у него нет. Публичный адрес не понадобится и для заказов: статусы
+бот забирает с сайта опросом ленты, а не вебхуком.
 
 Секретов в git: `.env` исключён и из репозитория, и из контекста сборки. На сервере
 он создаётся руками один раз.

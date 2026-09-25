@@ -230,3 +230,35 @@ def make_snapshot(
         stock=stock,
         price_type_bindings=bindings,
     )
+
+
+def make_pass_scopes() -> tuple[CatalogScope, ...]:
+    """What a two-page pass covers: products, one price list and the one warehouse."""
+    return (
+        make_scope(CatalogScopeKind.PRODUCTS),
+        make_scope(CatalogScopeKind.PRICES, price_type_id=PRICE_TYPE_ID),
+        make_scope(CatalogScopeKind.STOCK, warehouse_id=WAREHOUSE_ID),
+    )
+
+
+def make_pass_batches(batch_id: str = BATCH_ID) -> tuple[CatalogSnapshot, ...]:
+    """Two pages split by kind, the way the site pass yields them.
+
+    Four batches carrying six rows: three products over two pages, two prices
+    and one stock row on the first.
+    """
+    products, prices, stock = make_pass_scopes()
+    return (
+        make_snapshot(
+            products,
+            batch_id=batch_id,
+            products=(make_product_row(1), make_product_row(2)),
+        ),
+        make_snapshot(
+            prices,
+            batch_id=batch_id,
+            prices=(make_price_row(1), make_price_row(2)),
+        ),
+        make_snapshot(stock, batch_id=batch_id, stock=(make_stock_row(1),)),
+        make_snapshot(products, batch_id=batch_id, products=(make_product_row(3),)),
+    )

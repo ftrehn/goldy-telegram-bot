@@ -14,32 +14,21 @@ constructor: it caches the loaders it generates, and a retort per instance
 would regenerate them on every read and keep the cache for nothing.
 """
 
-from collections.abc import Iterator
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Final, final, override
 
 from adaptix import Retort, loader
-from adaptix.load_error import AggregateLoadError, LoadError, ValueLoadError
-from adaptix.struct_trail import get_trail
+from adaptix.load_error import LoadError, ValueLoadError
 
 from goldy.application.common.ports.catalog import CatalogSnapshot
+from goldy.infrastructure.adapters.catalog.adaptix_support import (
+    decimal_through_text,
+    load_error_reasons,
+)
 from goldy.infrastructure.adapters.catalog.catalog_snapshot_mapper import (
     CatalogSnapshotMapper,
 )
 from goldy.infrastructure.errors import CatalogSourceReadError
-
-
-def _decimal_through_text(value: object) -> Decimal:
-    """A number read through its text, so no binary float reaches a price."""
-    if isinstance(value, bool) or not isinstance(value, str | int | float):
-        msg = "Expected a number."
-        raise ValueLoadError(msg, value)
-
-    try:
-        return Decimal(str(value))
-    except InvalidOperation as exc:
-        msg = "Expected a number."
-        raise ValueLoadError(msg, value) from exc
 
 
 def _non_blank_text(value: object) -> str:
@@ -57,7 +46,7 @@ def _non_blank_text(value: object) -> str:
 
 _retort: Final[Retort] = Retort(
     recipe=[
-        loader(Decimal, _decimal_through_text),
+        loader(Decimal, decimal_through_text),
         loader(str, _non_blank_text),
     ],
 )
@@ -72,27 +61,6 @@ class AdaptixCatalogSnapshotMapper(CatalogSnapshotMapper):
         try:
             return _retort.load(document, CatalogSnapshot)
         except LoadError as exc:
-            reasons = "; ".join(_leaves(exc))
+            reasons = "; ".join(load_error_reasons(exc, "the snapshot"))
             msg = f"The catalog snapshot is not shaped like one: {reasons}."
             raise CatalogSourceReadError(msg) from exc
-
-
-def _leaves(exc: BaseException, trail: str = "") -> Iterator[str]:
-    """Every refusal in the tree adaptix raised, each with the path it names.
-
-    adaptix reports a model with two bad fields as one aggregate holding two
-    errors, and each error carries the trail from its parent. Flattened, the
-    seeder prints ``products[7].name: expected a string`` and whoever runs it
-    fixes the fixture instead of guessing at it.
-    """
-    path = trail + "".join(
-        f"[{segment}]" if isinstance(segment, int) else f".{segment}"
-        for segment in get_trail(exc)
-    )
-
-    if isinstance(exc, AggregateLoadError):
-        for inner in exc.exceptions:
-            yield from _leaves(inner, path)
-        return
-
-    yield f"{path.lstrip('.') or 'the snapshot'}: {exc}"

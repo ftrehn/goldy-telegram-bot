@@ -21,7 +21,7 @@ logger: Final[logging.Logger] = logging.getLogger(__name__)
 
 
 def create_scheduler_taskiq_app() -> TaskiqScheduler:
-    """Builds the scheduler that fires the outbox relay on a tick.
+    """Builds the scheduler that fires the outbox relay and the catalog pull.
 
     Reuses the worker's broker so both sides agree on queue naming and
     transport; a separately built one could drift and then fire into a queue

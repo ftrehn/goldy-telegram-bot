@@ -3,6 +3,9 @@ from typing import Final
 
 from dishka import Provider, Scope
 
+from goldy.application.commands.catalog.catalog_synchronizer import (
+    CatalogSynchronizer,
+)
 from goldy.application.common.ports.catalog import CatalogSource
 from goldy.infrastructure.adapters.catalog.adaptix_catalog_snapshot_mapper import (
     AdaptixCatalogSnapshotMapper,
@@ -16,12 +19,13 @@ from goldy.infrastructure.adapters.catalog.json_file_catalog_source import (
 
 
 def catalog_source_provider() -> Provider:
-    """Where a catalog snapshot is read from, for the one process that reads one.
+    """Where the seeder reads its catalog pass from: a JSON file.
 
-    Only the seeder gets this group. ``CatalogSource`` is not a collaborator of
-    ``ImportCatalogHandler`` precisely so that the bot and the worker never
-    learn the port exists: they have no file to read and nothing bound to read
-    it with, and a container that refuses to build is the good outcome of the
+    Only the seeder gets this group; the worker binds the same port to the
+    site API through ``site_catalog_provider``. ``CatalogSource`` is not a
+    collaborator of ``ImportCatalogHandler`` precisely so that the bot never
+    learns the port exists: it has no source and nothing bound to read one
+    with, and a container that refuses to build is the good outcome of the
     mistake, not a cost.
 
     The path arrives as request-scoped context rather than as a config, because
@@ -45,4 +49,5 @@ def catalog_source_provider() -> Provider:
         scope=Scope.APP,
     )
     provider.provide(source=JsonFileCatalogSource, provides=CatalogSource)
+    provider.provide(source=CatalogSynchronizer)
     return provider

@@ -11,12 +11,13 @@ from .catalog_snapshot import (
     ProductRow,
     StockRow,
 )
-from .catalog_source import CatalogSource
+from .catalog_source import CatalogPull, CatalogSource
 from .pricing_reader import CartPrices, PricingReader, ResolvedPriceType
 
 __all__ = [
     "CartPrices",
     "CatalogProjectionDao",
+    "CatalogPull",
     "CatalogQueryGateway",
     "CatalogScope",
     "CatalogScopeKind",

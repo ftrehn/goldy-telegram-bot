@@ -86,6 +86,11 @@ ignore = [
 # for its two buttons, and turning a page is a dictionary write with nothing to
 # await. The alternative is four dialogs each writing the same async wrapper.
 "src/goldy/presentation/telegram/common/paging.py" = ["RUF029"]
+# ``CatalogPull.batches`` is an async stream by the port's contract, and a
+# file is a stream of exactly one batch that is already in memory — so its
+# generator yields without awaiting. The rule reads that as a needless
+# ``async``; the port needs it.
+"src/goldy/infrastructure/adapters/catalog/json_file_catalog_source.py" = ["RUF029"]
 # Tests: asserts are the point (S101); fake credentials and magic literals are
 # expected fixture data (S105/S106/S107/PLR2004); object-mother factories take
 # many keyword args (PLR0913); a test names every fixture it needs and pytest

@@ -8,7 +8,10 @@ from taskiq.schedule_sources import LabelScheduleSource
 from taskiq_aio_pika import AioPikaBroker, Exchange, Queue
 from taskiq_redis import ListRedisScheduleSource, RedisAsyncResultBackend
 
-from goldy.infrastructure.task_manager.tasks import setup_outbox_tasks
+from goldy.infrastructure.task_manager.tasks import (
+    setup_catalog_tasks,
+    setup_outbox_tasks,
+)
 from goldy.setup.configs.rabbitmq_config import RabbitMQConfig
 from goldy.setup.configs.redis_config import RedisConfig
 from goldy.setup.configs.taskiq_config import TaskIQConfig
@@ -102,15 +105,19 @@ def setup_event_broker(rabbitmq_config: RabbitMQConfig) -> RabbitBroker:
     return RabbitBroker(url=rabbitmq_config.uri)
 
 
-def setup_task_manager_tasks(broker: AsyncBroker) -> None:
+def setup_task_manager_tasks(broker: AsyncBroker, catalog_sync_cron: str) -> None:
     """Registers every background task on the broker.
 
     Registration is what makes a task name resolvable, and the name is all the
     scheduler has to go on. A task missing from here does not fail at startup —
     it fails as work that never happened, which is the hardest kind of failure
     to notice, so every entry point calls this and so do the tests.
+
+    *catalog_sync_cron* is ``SiteApiConfig.catalog_sync_cron``, passed as a
+    string so the task module stays ignorant of setup's configs.
     """
     setup_outbox_tasks(broker)
+    setup_catalog_tasks(broker, catalog_sync_cron)
 
 
 def setup_scheduler(
@@ -126,8 +133,9 @@ def setup_scheduler(
 
     Two sources, because schedules arrive two ways. ``LabelScheduleSource``
     reads the cron declared at registration, which is what drives the outbox
-    relay; the Redis source holds schedules created at runtime and survives a
-    restart. With only the latter, a cron declared on a task would never fire.
+    relay and the catalog pull; the Redis source holds schedules created at
+    runtime and survives a restart. With only the latter, a cron declared on a
+    task would never fire.
     """
     return TaskiqScheduler(
         broker=broker,

@@ -13,8 +13,10 @@ class CatalogSnapshotMapper(Protocol):
     source adapter reads bytes and decodes JSON; this port decides whether what
     came out is a snapshot, and says exactly where it is not.
 
-    A port so that the seeder's file today and the HTTP receiver 1C posts to
-    tomorrow can share one reading of the contract, and so that the reading
+    A port so that the seeder's file and anything else that hands over a
+    whole snapshot document can share one reading of the contract (the site's
+    catalog, which is not shaped like a snapshot, has its own reader in
+    ``site_catalog_documents``), and so that the reading
     can be replaced — a different 1C export, a different mapper — without the
     source that feeds it changing.
     """

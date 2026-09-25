@@ -93,14 +93,14 @@ def bootstrap_handlers_provider() -> Provider:
 
     Seeding administrators happens at startup on the authority of the
     configuration, not of a person, so it needs no identity. Catalog import is
-    here for the same reason and one more: the data arrives from 1C over a
-    queue the worker serves and from a file the seeder reads, and neither of
-    those processes has a customer to speak for.
+    here for the same reason and one more: the data arrives from the site API
+    the worker pulls on a schedule (ADR-0004) and from a file the seeder reads,
+    and neither of those processes has a customer to speak for.
 
     ``ImportCatalogHandler`` takes the snapshot as part of the command and not
     ``CatalogSource`` as a collaborator, which is what keeps this group
     resolvable everywhere. Make the port a dependency and every container
-    inherits it, including the two where no source is bound.
+    inherits it, including the bot's, where no source is bound.
     """
     provider: Final[Provider] = Provider(scope=Scope.REQUEST)
     provider.provide(source=SeedAdminsHandler)

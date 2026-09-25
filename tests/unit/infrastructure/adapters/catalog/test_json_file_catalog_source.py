@@ -72,6 +72,29 @@ async def test_a_snapshot_arrives_with_its_batch_and_its_scope(
     assert snapshot.products[0].sku == "AB-12345"
 
 
+async def test_a_file_is_a_pass_of_one_batch_swept_over_the_scope_it_names(
+    tmp_path: Path,
+) -> None:
+    """The seeder goes through the same synchronizer as the worker's site pull."""
+    path = tmp_path / "snapshot.json"
+    path.write_text(MINIMAL, encoding="utf-8")
+
+    pull = await _source_at(path).pull()
+    batches = [snapshot async for snapshot in pull.batches]
+
+    assert pull.batch_id == "seed-0001"
+    assert [scope.kind for scope in pull.scopes] == [CatalogScopeKind.PRODUCTS]
+    assert [snapshot.batch_id for snapshot in batches] == ["seed-0001"]
+
+
+async def test_a_broken_file_fails_the_pull_before_any_batch(tmp_path: Path) -> None:
+    """Nothing may be imported from a fixture that is not a snapshot."""
+    source = _source_at(tmp_path / "missing.json")
+
+    with pytest.raises(CatalogSourceReadError):
+        await source.pull()
+
+
 async def test_a_collection_the_batch_does_not_carry_is_empty_rather_than_missing(
     tmp_path: Path,
 ) -> None:

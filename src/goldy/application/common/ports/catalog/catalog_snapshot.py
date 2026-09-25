@@ -128,7 +128,7 @@ class StockRow:
     and reserved are not stored separately and will not be — that would be two
     columns and a second question the bot cannot answer correctly.
 
-    1C gives no warehouse breakdown today, so the consumer writes a fixed
+    The site gives no warehouse breakdown today, so the source writes a fixed
     ``'*'``; the storefront query sums with a group-by from the first day, so
     real warehouses appearing changes neither the SQL nor this contract.
     """
@@ -179,9 +179,10 @@ class CatalogSnapshot:
     ``Номенклатура`` element with ``ЭтоГруппа``, an ``Артикул`` that is blank
     and a ``Код`` that never is, a price register keyed by ``ВидЦен`` — is the
     business of the adapter that receives it: today ``JsonFileCatalogSource``
-    with the mapper behind it, tomorrow the HTTP receiver 1C posts to. That is
-    where a 1C attribute is renamed, a blank article is replaced by the code,
-    and a number is turned into text. When the real export turns out to be
+    with the mapper behind it, and the site's catalog JSON read by
+    ``SiteCatalogSource`` (ADR-0004). That is where an attribute is renamed, a
+    blank article is replaced by a code the source has, and a number is turned
+    into text. When the real export turns out to be
     shaped differently from the fixture, the mapper changes and this file does
     not; and if a fact 1C sends turns out to be needed here, a row grows a
     field with a name of ours.

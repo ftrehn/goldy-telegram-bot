@@ -15,6 +15,7 @@ from .mediator_provider import mediator_provider
 from .notifications_provider import notifications_provider
 from .pipelines_provider import pipelines_provider
 from .services_provider import services_provider
+from .site_api_provider import site_api_provider
 from .task_manager_provider import task_manager_provider
 from .telegram_provider import TelegramProvider, telegram_context_provider
 
@@ -34,6 +35,7 @@ __all__ = [
     "pipelines_provider",
     "services_provider",
     "shop_handlers_provider",
+    "site_api_provider",
     "task_manager_provider",
     "telegram_context_provider",
     "user_handlers_provider",

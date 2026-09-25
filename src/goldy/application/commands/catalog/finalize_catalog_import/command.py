@@ -12,8 +12,8 @@ class FinalizeCatalogImportCommand(Command[CatalogFinalizationResponse]):
     Separate from the import itself because the two answer different
     questions. ``ImportCatalogCommand`` says "here is some data", which may be
     one chunk of many; this one says "that was all of it", which only the
-    sender knows — the seeder after its single batch, the consumer on the
-    message that closes an exchange.
+    sender knows — ``CatalogSynchronizer``, once the whole pass of the site
+    (or the seeder's single batch) went in.
 
     The scope is not decoration. "Whatever was not mentioned is gone" holds
     only inside the part of the projection the batch was about: exporting one

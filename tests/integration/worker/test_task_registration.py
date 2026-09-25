@@ -11,8 +11,10 @@ from taskiq import AsyncBroker
 
 from goldy.application.common.ports.task_manager.task_keys import (
     RELAY_OUTBOX_TASK_NAME,
+    SYNC_CATALOG_TASK_NAME,
 )
 from goldy.infrastructure.task_manager.tasks.outbox_tasks import RELAY_CRON
+from goldy.setup.configs.site_api_config import DEFAULT_CATALOG_SYNC_CRON
 
 pytestmark = pytest.mark.integration
 
@@ -39,3 +41,16 @@ def test_the_relay_carries_a_cron(taskiq_broker: AsyncBroker) -> None:
     task = taskiq_broker.get_all_tasks()[RELAY_OUTBOX_TASK_NAME]
 
     assert task.labels["schedule"] == [{"cron": RELAY_CRON}]
+
+
+def test_the_catalog_pull_is_registered_on_the_configured_schedule(
+    taskiq_broker: AsyncBroker,
+) -> None:
+    """The cron comes from ``GOLDY_CATALOG_SYNC_CRON``; lose it and the catalog freezes.
+
+    Nothing fails when the pull never fires — the bot keeps showing yesterday's
+    prices — so the registration and its schedule are checked by name.
+    """
+    task = taskiq_broker.get_all_tasks()[SYNC_CATALOG_TASK_NAME]
+
+    assert task.labels["schedule"] == [{"cron": DEFAULT_CATALOG_SYNC_CRON}]

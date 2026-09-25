@@ -9,6 +9,7 @@ from goldy.setup.ioc.providers import (
     notification_handlers_provider,
     notifications_provider,
     outbox_handlers_provider,
+    site_api_provider,
     task_manager_provider,
 )
 
@@ -24,7 +25,8 @@ def worker_providers() -> Iterable[Provider]:
     The notification groups are the mirror image of that rule. They carry the
     Bot API client and the token behind it, and only this process gets them:
     the bot answers the person who wrote to it, while the worker writes to
-    people who did not.
+    people who did not. ``site_api_provider`` follows the same rule for the
+    site token: only the worker pulls the catalog from the site (ADR-0004).
     """
     return (
         *common_providers(),
@@ -32,6 +34,7 @@ def worker_providers() -> Iterable[Provider]:
         outbox_handlers_provider(),
         notifications_provider(),
         notification_handlers_provider(),
+        site_api_provider(),
         TaskiqProvider(),
     )
 

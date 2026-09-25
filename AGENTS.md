@@ -1,12 +1,15 @@
 # goldy
 
 A shop bot. It runs in Telegram today and MAX later, takes orders from
-customers, and reads its product catalog out of a 1C installation on another
-server over RabbitMQ.
+customers, and pulls its product catalog from the shop's site, tkgoldy.ru, over
+the site's HTTP API. **The site is the only bridge to 1C**: the bot never talks
+to 1C itself ([ADR-0004](docs/adr/0004-site-is-the-only-bridge-to-1c.md)). The
+site's contract is `docs/API.md` in the site repository.
 
-**1C is read-only.** The catalog comes from it; customers, orders and everything
-else belong to this service. There is no counterparty, no synchronisation back,
-and no 1C concept inside the domain.
+**The catalog is read-only.** It comes from the site; customers, orders and
+everything else belong to this service. There is no counterparty and no 1C
+concept inside the domain. Handing orders over to the site and reading their
+statuses back is the decided next phase (ADR-0004), not yet built.
 
 ## Project structure
 
@@ -21,6 +24,8 @@ src/goldy/
   worker_app.py    taskiq worker entry point
   scheduler_app.py taskiq scheduler entry point
   catalog_seed_app.py  catalog seeder entry point — a JSON snapshot, no messenger
+                   (the worker's scheduled `sync_catalog` task pulls the real
+                   catalog from the site)
 tests/
   unit/            domain + application + our own infrastructure logic
   integration/     anything crossing a process boundary
@@ -87,7 +92,8 @@ domain/
 ```
 
 **`catalog` has no aggregate on purpose.** The catalog is a read-only
-projection of 1C; the bot never creates, changes or deletes a product, so there
+projection of what the site serves (and the site of 1C); the bot never creates,
+changes or deletes a product, so there
 is no invariant for an aggregate to protect. What lives here is the handful of
 values an order has to keep as a snapshot, and a `ProductId` the domain reads
 but never mints — which is why this package has no id generator and must not
@@ -273,7 +279,11 @@ keyed and ordered by them.
 - **dishka** for DI, **aiogram** + **aiogram-dialog** for Telegram,
   **dishka-faststream** for the worker's subscribers.
 - **adaptix** for aggregate → view mapping and for reading the catalog
-  snapshot off a decoded JSON document (`AdaptixCatalogSnapshotMapper`).
+  snapshot off a decoded JSON document (`AdaptixCatalogSnapshotMapper`) and
+  the site's catalog JSON (`site_catalog_documents`).
+- **httpx** for the site API (`SiteApiClient`) — the only outbound HTTP client
+  of our own; it turns every transport, status and envelope failure into a
+  `SiteApiError` subclass.
 
 Value objects reach the database through `TypeDecorator`s in
 `persistence/models/types.py`. Multi-field value objects are a `composite`.
@@ -300,7 +310,7 @@ assembled per process** in `setup/ioc/containers/`:
 | Container | Gets |
 |---|---|
 | `make_telegram_container` | core + interactive + Telegram + aiogram |
-| `make_worker_container` | core + task manager + outbox handlers + notifications + taskiq |
+| `make_worker_container` | core + task manager + outbox handlers + notifications + site API + taskiq |
 | `make_catalog_seed_container` | core + the catalog source, and nothing that expects a person |
 
 Handlers are grouped by **what they need**, not who calls them. Anything needing
@@ -313,8 +323,11 @@ do not merge the groups to make a wiring error go away.
 `notifications_provider` is the same rule applied to a secret rather than to an
 identity. It carries the Bot API client and the token behind it, and only the
 worker gets it: the bot answers whoever wrote to it, while the worker writes to
-people who did not. `configs_provider` still hands `TelegramConfig` and
-`NotificationConfig` to nobody — each process contributes its own.
+people who did not. `site_api_provider` is the same again for the site token:
+the HTTP client, the site-backed `CatalogSource` and the `CatalogSynchronizer`
+the `sync_catalog` task runs. `configs_provider` still hands `TelegramConfig`,
+`NotificationConfig` and `SiteApiConfig` to nobody — each process contributes
+its own.
 
 MAX will be a fourth container over the same core, differing only in how it
 answers "who is writing".
@@ -466,6 +479,17 @@ Read the relevant entry before touching that area.
 - **The initial migration was written by hand**, from DDL compiled off the
   metadata. Run `just migration "check"` against a real database before the
   first deploy; the diff should be empty.
+
+**Catalog sync**
+
+- **Finalise only after the whole pass.** Each batch commits on its own; a
+  sweep after a partial pass deactivates every product the missing pages held.
+  `CatalogSynchronizer` finalises the scopes `CatalogPull` declared, and only
+  when the batch stream ended without an error. Two passes running at once
+  sweep each other's rows — only the schedule prevents that, there is no lock.
+- **Never invent `source_changed_at`.** A stamp older than the stored one makes
+  the upsert skip the row without restamping its `batch_id`, and the next
+  finalisation sweeps it. The site has no reliable stamps, so rows carry `null`.
 
 **Mapping**
 

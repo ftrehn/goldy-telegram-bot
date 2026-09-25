@@ -9,7 +9,7 @@ from goldy.application.commands.catalog.import_catalog.handler import (
     ImportCatalogHandler,
 )
 from tests.unit.factories.shop_factories import make_price_type_id
-from tests.unit.stubs.catalog import RecordingCatalogProjectionDao
+from tests.unit.stubs.catalog import CatalogCommandSender, RecordingCatalogProjectionDao
 
 
 @pytest.fixture()
@@ -30,3 +30,11 @@ def finalize_catalog_import_handler(
 ) -> FinalizeCatalogImportHandler:
     """Configured with the same default price type the fixtures import."""
     return FinalizeCatalogImportHandler(projection_dao, make_price_type_id())
+
+
+@pytest.fixture()
+def catalog_command_sender(
+    import_catalog_handler: ImportCatalogHandler,
+    finalize_catalog_import_handler: FinalizeCatalogImportHandler,
+) -> CatalogCommandSender:
+    return CatalogCommandSender(import_catalog_handler, finalize_catalog_import_handler)

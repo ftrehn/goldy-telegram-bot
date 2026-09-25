@@ -59,7 +59,7 @@
   ],
   "price_types": [
     {
-      "id": "pt-retail",
+      "id": "BASE",
       "name": "Розничная",
       "currency": "RUB",
       "source_changed_at": "2026-09-01T00:00:00+03:00"
@@ -74,7 +74,7 @@
   "prices": [
     {
       "product_id": "3b7d5e60-0000-4000-8000-00000000000a",
-      "price_type_id": "pt-retail",
+      "price_type_id": "BASE",
       "amount": "12.40",
       "currency": "RUB",
       "source_changed_at": "2026-09-10T09:10:00+03:00"
@@ -88,14 +88,14 @@
     },
     {
       "product_id": "3b7d5e60-0000-4000-8000-00000000000b#char-1",
-      "price_type_id": "pt-retail",
+      "price_type_id": "BASE",
       "amount": "380.00",
       "currency": "RUB",
       "source_changed_at": "2026-09-10T09:10:00+03:00"
     },
     {
       "product_id": "3b7d5e60-0000-4000-8000-00000000000c",
-      "price_type_id": "pt-retail",
+      "price_type_id": "BASE",
       "amount": "7490.00",
       "currency": "RUB",
       "source_changed_at": "2026-09-10T09:10:00+03:00"

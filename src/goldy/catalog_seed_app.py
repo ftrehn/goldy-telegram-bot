@@ -6,8 +6,9 @@ Run with::
 
 A fourth process rather than a flag on the bot, because filling the catalog is
 not something a running bot should be able to do to itself: the job opens no
-broker, serves nobody and exits. Until 1C is on the other end of the queue,
-this is how the projection gets its contents.
+broker, serves nobody and exits. In production the worker pulls the catalog
+from the site (ADR-0004); this is how a projection gets its contents without
+the site — locally, in a test, or before the site's API is reachable.
 """
 
 import argparse

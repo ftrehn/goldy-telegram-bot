@@ -16,8 +16,9 @@ from taskiq import AsyncBroker, ScheduleSource, TaskiqEvents, TaskiqState
 
 from goldy.setup.bootstrap.setups.configs_setup import (
     SharedConfigs,
-    load_notification_config,
+    WorkerConfigs,
     load_shared_configs,
+    load_worker_configs,
     make_worker_container_context,
 )
 from goldy.setup.bootstrap.setups.database_setup import setup_map_tables
@@ -33,7 +34,6 @@ from goldy.setup.bootstrap.setups.task_manager_setup import (
     setup_task_manager_tasks,
 )
 from goldy.setup.configs.logging_config import LoggingConfig
-from goldy.setup.configs.notification_config import NotificationConfig
 from goldy.setup.ioc.containers import make_worker_container
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
@@ -50,6 +50,9 @@ def create_worker_taskiq_app() -> AsyncBroker:
     Retry middleware is applied here and nowhere else: only the side that
     executes a task can retry it, and the bot never does.
 
+    The catalog pull from the site (ADR-0004) is registered here with the rest
+    of the tasks, on the schedule ``GOLDY_CATALOG_SYNC_CRON`` sets.
+
     This process both publishes and consumes on the event broker. The relay
     publishes domain events to the topic exchange on its cron tick, and the
     notification subscribers read them back off it — which is why the broker is
@@ -57,7 +60,7 @@ def create_worker_taskiq_app() -> AsyncBroker:
     before that happens.
     """
     configs: SharedConfigs = load_shared_configs()
-    notification_config: NotificationConfig = load_notification_config()
+    worker_configs: WorkerConfigs = load_worker_configs()
     configure_logging(LoggingConfig())
 
     worker_broker: AsyncBroker = setup_task_manager_middlewares(
@@ -65,7 +68,10 @@ def create_worker_taskiq_app() -> AsyncBroker:
         taskiq_config=configs.taskiq,
     )
 
-    setup_task_manager_tasks(worker_broker)
+    setup_task_manager_tasks(
+        worker_broker,
+        catalog_sync_cron=worker_configs.site_api.catalog_sync_cron,
+    )
 
     schedule_source: ScheduleSource = setup_schedule_source(configs.redis)
 
@@ -90,7 +96,7 @@ def create_worker_taskiq_app() -> AsyncBroker:
             worker_broker,
             schedule_source,
             event_broker,
-            notification_config,
+            worker_configs,
         ),
     )
     setup_dishka(container, broker=worker_broker)

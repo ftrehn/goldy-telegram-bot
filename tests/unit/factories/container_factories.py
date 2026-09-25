@@ -19,6 +19,7 @@ from taskiq.schedule_sources import LabelScheduleSource
 
 from goldy.setup.bootstrap.setups.configs_setup import (
     SharedConfigs,
+    WorkerConfigs,
     make_telegram_container_context,
     make_worker_container_context,
 )
@@ -26,6 +27,7 @@ from goldy.setup.configs.admin_config import AdminConfig
 from goldy.setup.configs.alchemy_config import SQLAlchemyConfig
 from goldy.setup.configs.catalog_config import CatalogConfig
 from goldy.setup.configs.notification_config import NotificationConfig
+from goldy.setup.configs.site_api_config import SiteApiConfig
 from goldy.setup.configs.taskiq_config import TaskIQConfig
 from goldy.setup.configs.telegram_config import TelegramConfig
 from tests.unit.factories.config_factories import (
@@ -78,6 +80,8 @@ def create_worker_context() -> dict[type, object]:
     built — the factory is ``APP``-scoped and lazy — but the key has to be in
     the context or the worker graph has no token to resolve and the build
     fails, which is precisely the wiring these contexts exist to exercise.
+    The site API config is the same story: the HTTP client is built lazily,
+    so nothing is dialled, but the key has to be there.
     """
     broker: AsyncBroker = InMemoryBroker()
     schedule_source: ScheduleSource = LabelScheduleSource(broker)
@@ -86,7 +90,13 @@ def create_worker_context() -> dict[type, object]:
         broker,
         schedule_source,
         RabbitBroker(),
-        NotificationConfig(bot_token=VALID_SHAPED_BOT_TOKEN),
+        WorkerConfigs(
+            notification=NotificationConfig(bot_token=VALID_SHAPED_BOT_TOKEN),
+            site_api=SiteApiConfig(
+                base_url="http://localhost/api/v1",
+                token="tkg_test_token",
+            ),
+        ),
     )
 
 

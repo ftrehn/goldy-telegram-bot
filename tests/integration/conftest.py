@@ -56,6 +56,7 @@ from goldy.domain.users.values.user_role import UserRole
 from goldy.infrastructure.persistence.models.base import metadata
 from goldy.setup.bootstrap.setups.configs_setup import (
     SharedConfigs,
+    WorkerConfigs,
     make_telegram_container_context,
     make_worker_container_context,
 )
@@ -66,6 +67,7 @@ from goldy.setup.configs.alchemy_config import SQLAlchemyConfig
 from goldy.setup.configs.catalog_config import CatalogConfig
 from goldy.setup.configs.notification_config import NotificationConfig
 from goldy.setup.configs.postgres_config import PostgresConfig
+from goldy.setup.configs.site_api_config import DEFAULT_CATALOG_SYNC_CRON, SiteApiConfig
 from goldy.setup.configs.taskiq_config import TaskIQConfig
 from goldy.setup.configs.telegram_config import TelegramConfig
 from goldy.setup.ioc.containers import make_telegram_container, make_worker_container
@@ -329,7 +331,7 @@ def taskiq_broker() -> AsyncBroker:
     and a test that registered its own would never see it.
     """
     broker: Final[AsyncBroker] = InMemoryBroker()
-    setup_task_manager_tasks(broker)
+    setup_task_manager_tasks(broker, catalog_sync_cron=DEFAULT_CATALOG_SYNC_CRON)
     return broker
 
 
@@ -353,7 +355,13 @@ async def worker_container(
             taskiq_broker,
             schedule_source,
             event_broker,
-            NotificationConfig(bot_token=RecordingBot.TOKEN),
+            WorkerConfigs(
+                notification=NotificationConfig(bot_token=RecordingBot.TOKEN),
+                site_api=SiteApiConfig(
+                    base_url="http://localhost/api/v1",
+                    token="tkg_integration",
+                ),
+            ),
         ),
     )
     setup_taskiq_dishka(container, broker=taskiq_broker)

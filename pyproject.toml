@@ -46,6 +46,7 @@ dependencies = [
     "dishka-faststream>=0.7.0",
     "faststream[rabbit]>=0.7.3",
     "fluent-runtime>=0.4.0",
+    "httpx>=0.28.0",
     "sqlalchemy[asyncio]==2.0.52",
     "structlog==26.1.0",
     "taskiq>=0.12.6",
@@ -73,7 +74,6 @@ test = [
     # calls `Bot.set_current`, which no longer exists. Only `MockedSession` and
     # `types.dataset` are used — the dispatcher under test is the real one.
     "aiogram-testing>=1.1.0",
-    "httpx>=0.28.0",
     "nox>=2026.8.17",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",

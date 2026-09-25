@@ -11,15 +11,32 @@ refuses a stale row is decided by a SQL condition in the adapter, so a stub
 that reimplemented it would prove nothing about the handler that calls it.
 """
 
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
-from typing import final, override
+from typing import cast, final, override
 
+from goldy.application.commands.catalog.finalize_catalog_import.command import (
+    FinalizeCatalogImportCommand,
+)
+from goldy.application.commands.catalog.finalize_catalog_import.handler import (
+    FinalizeCatalogImportHandler,
+)
+from goldy.application.commands.catalog.import_catalog.command import (
+    ImportCatalogCommand,
+)
+from goldy.application.commands.catalog.import_catalog.handler import (
+    ImportCatalogHandler,
+)
+from goldy.application.common.mediator.markers import BaseRequest
+from goldy.application.common.mediator.sender import Sender
 from goldy.application.common.ports.catalog import (
     CartPrices,
     CatalogProjectionDao,
+    CatalogPull,
     CatalogQueryGateway,
     CatalogScope,
+    CatalogSnapshot,
+    CatalogSource,
     CategoryRow,
     PriceRow,
     PriceTypeBindingRow,
@@ -41,6 +58,7 @@ from goldy.application.common.views.catalog import (
     ProductSearchView,
     ProductView,
 )
+from goldy.application.error import CatalogSnapshotError, CatalogSourceError
 from goldy.domain.catalog.values.category_id import CategoryId
 from goldy.domain.catalog.values.price_type_id import PriceTypeId
 from goldy.domain.catalog.values.priced_product import PricedProduct
@@ -273,3 +291,89 @@ class RecordingCatalogProjectionDao(CatalogProjectionDao):
     @override
     async def has_price_type(self, price_type_id: PriceTypeId) -> bool:
         return price_type_id.value in self.present_price_types
+
+
+@final
+class ScriptedCatalogSource(CatalogSource):
+    """A pass whose batches, scopes and failure point a test spells out.
+
+    ``failure`` is raised by the batch stream after every scripted batch was
+    handed out, which is the shape of a site that answered six pages and
+    timed out on the seventh.
+    """
+
+    def __init__(
+        self,
+        *,
+        batch_id: str,
+        scopes: tuple[CatalogScope, ...],
+        batches: tuple[CatalogSnapshot, ...] = (),
+        failure: CatalogSourceError | None = None,
+    ) -> None:
+        self._batch_id = batch_id
+        self._scopes = scopes
+        self._batches = batches
+        self._failure = failure
+
+    @override
+    async def pull(self) -> CatalogPull:
+        return CatalogPull(
+            batch_id=self._batch_id,
+            scopes=self._scopes,
+            batches=self._stream(),
+        )
+
+    async def _stream(self) -> AsyncIterator[CatalogSnapshot]:
+        for batch in self._batches:
+            yield batch
+
+        if self._failure is not None:
+            raise self._failure
+
+
+@final
+class CatalogCommandSender(Sender):
+    """Runs the two catalog commands through their real handlers, in order.
+
+    The handlers are the real ones over the recording projection, so the
+    responses a synchronizer adds up are the ones production gives it; what
+    this adds is the list of requests in the order they were sent, which is
+    the thing a test of "finalise only after every import" has to look at.
+
+    ``fail_on_import`` makes the import with that ordinal (1-based) refuse,
+    the way a transaction that hit the database would.
+    """
+
+    def __init__(
+        self,
+        import_handler: ImportCatalogHandler,
+        finalize_handler: FinalizeCatalogImportHandler,
+    ) -> None:
+        self._import_handler = import_handler
+        self._finalize_handler = finalize_handler
+        self.requests: list[BaseRequest[object]] = []
+        self.fail_on_import: int | None = None
+
+    @property
+    def imports(self) -> list[ImportCatalogCommand]:
+        return [r for r in self.requests if isinstance(r, ImportCatalogCommand)]
+
+    @property
+    def finalizations(self) -> list[FinalizeCatalogImportCommand]:
+        return [r for r in self.requests if isinstance(r, FinalizeCatalogImportCommand)]
+
+    @override
+    async def send[TResponse](self, request: BaseRequest[TResponse]) -> TResponse:
+        self.requests.append(request)
+
+        if isinstance(request, ImportCatalogCommand):
+            if len(self.imports) == self.fail_on_import:
+                msg = "The import transaction failed."
+                raise CatalogSnapshotError(msg)
+            return cast("TResponse", await self._import_handler.handle(request))
+
+        if isinstance(request, FinalizeCatalogImportCommand):
+            return cast("TResponse", await self._finalize_handler.handle(request))
+
+        msg = f"{type(request).__name__} is not a catalog command."
+        raise AssertionError(msg)

@@ -1,10 +1,15 @@
 import asyncio
 import json
 import logging
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Final, override
 
-from goldy.application.common.ports.catalog import CatalogSnapshot, CatalogSource
+from goldy.application.common.ports.catalog import (
+    CatalogPull,
+    CatalogSnapshot,
+    CatalogSource,
+)
 from goldy.infrastructure.adapters.catalog.catalog_snapshot_mapper import (
     CatalogSnapshotMapper,
 )
@@ -16,15 +21,14 @@ logger: Final[logging.Logger] = logging.getLogger(__name__)
 class JsonFileCatalogSource(CatalogSource):
     """Reads one catalog batch out of a JSON file.
 
-    The seeder's source and nothing more. The RabbitMQ consumer that replaces
-    it pushes rather than pulls and will not implement this port at all — the
-    seam of the integration is ``ImportCatalogCommand``, which both of them
-    send.
+    The seeder's source and nothing more. The worker pulls the real catalog
+    from the site API through the same port (ADR-0004); a file is a pass of
+    exactly one batch, finalised over the one scope the file names.
 
     Two jobs, and only the first is this class's own: getting text off the
     disk and decoding it as JSON. Whether what came out is a snapshot is the
     mapper's question, injected through the constructor so the HTTP receiver
-    that comes later asks the same one of a request body — and so the reading
+    that could come later asks the same one of a request body — and so the reading
     of the contract can change without this file changing.
 
     The path arrives in the constructor as request-scoped context, because it
@@ -47,7 +51,27 @@ class JsonFileCatalogSource(CatalogSource):
         self._mapper: Final[CatalogSnapshotMapper] = catalog_snapshot_mapper
 
     @override
+    async def pull(self) -> CatalogPull:
+        """The file as a pass of one batch, swept over the scope it names.
+
+        The file is read here rather than lazily, so a missing or malformed
+        fixture fails before anything is imported — the port promises that of
+        every source.
+        """
+        snapshot = await self.read_snapshot()
+        return CatalogPull(
+            batch_id=snapshot.batch_id,
+            scopes=(snapshot.scope,),
+            batches=_one(snapshot),
+        )
+
     async def read_snapshot(self) -> CatalogSnapshot:
+        """The one batch the file holds.
+
+        Raises:
+            CatalogSourceReadError: the file cannot be read, is not JSON, or
+                is not shaped like a snapshot.
+        """
         snapshot = self._mapper.to_snapshot(_parse(await self._read()))
 
         logger.info(
@@ -77,6 +101,11 @@ class JsonFileCatalogSource(CatalogSource):
             logger.exception("failed to decode the catalog file")
             msg = f"The catalog snapshot at '{self._path}' is not valid UTF-8."
             raise CatalogSourceReadError(msg) from e
+
+
+async def _one(snapshot: CatalogSnapshot) -> AsyncIterator[CatalogSnapshot]:
+    """The single batch of a file, as the stream ``CatalogPull`` carries."""
+    yield snapshot
 
 
 def _parse(text: str) -> object:

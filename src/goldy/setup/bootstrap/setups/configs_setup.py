@@ -15,6 +15,7 @@ from goldy.setup.bootstrap.loaders.notification_config_loader import (
 from goldy.setup.bootstrap.loaders.postgres_config_loader import PostgresConfigLoader
 from goldy.setup.bootstrap.loaders.rabbitmq_config_loader import RabbitMQConfigLoader
 from goldy.setup.bootstrap.loaders.redis_config_loader import RedisConfigLoader
+from goldy.setup.bootstrap.loaders.site_api_config_loader import SiteApiConfigLoader
 from goldy.setup.bootstrap.loaders.taskiq_config_loader import TaskIQConfigLoader
 from goldy.setup.bootstrap.loaders.telegram_config_loader import TelegramConfigLoader
 from goldy.setup.bootstrap.sources.admin_env_source_factory import AdminEnvSourceFactory
@@ -34,6 +35,9 @@ from goldy.setup.bootstrap.sources.rabbitmq_env_source_factory import (
     RabbitMQEnvSourceFactory,
 )
 from goldy.setup.bootstrap.sources.redis_env_source_factory import RedisEnvSourceFactory
+from goldy.setup.bootstrap.sources.site_api_env_source_factory import (
+    SiteApiEnvSourceFactory,
+)
 from goldy.setup.bootstrap.sources.taskiq_env_source_factory import (
     TaskIQEnvSourceFactory,
 )
@@ -47,6 +51,7 @@ from goldy.setup.configs.notification_config import NotificationConfig
 from goldy.setup.configs.postgres_config import PostgresConfig
 from goldy.setup.configs.rabbitmq_config import RabbitMQConfig
 from goldy.setup.configs.redis_config import RedisConfig
+from goldy.setup.configs.site_api_config import SiteApiConfig
 from goldy.setup.configs.taskiq_config import TaskIQConfig
 from goldy.setup.configs.telegram_config import TelegramConfig
 
@@ -122,12 +127,50 @@ def load_notification_config() -> NotificationConfig:
     return NotificationConfigLoader(NotificationEnvSourceFactory()).load()
 
 
+def load_site_api_config() -> SiteApiConfig:
+    """Read only by the worker and the scheduler — where the catalog comes from.
+
+    Kept out of :class:`SharedConfigs` for the reason the notification token
+    is: the bundle reaches every process, and the site token has no business
+    in the bot's. The scheduler reads it because it builds the worker's broker,
+    and the catalog pull's schedule is declared on that broker.
+    """
+    return SiteApiConfigLoader(SiteApiEnvSourceFactory()).load()
+
+
+@dataclass(frozen=True, slots=True)
+class WorkerConfigs:
+    """The settings only the worker process holds, loaded by its entry point.
+
+    A parameter object rather than two more arguments to
+    :func:`make_worker_container_context`: both are secrets the worker alone
+    carries, they travel together from the entry point to the container, and
+    the next one — the MAX token — will join them here rather than grow the
+    signature again.
+
+    Attributes:
+        notification: The Bot API token the worker writes to people with.
+        site_api: How the worker reaches the site it pulls the catalog from.
+    """
+
+    notification: NotificationConfig
+    site_api: SiteApiConfig
+
+
+def load_worker_configs() -> WorkerConfigs:
+    """Everything :class:`WorkerConfigs` holds, read from the environment."""
+    return WorkerConfigs(
+        notification=load_notification_config(),
+        site_api=load_site_api_config(),
+    )
+
+
 def make_worker_container_context(
     configs: SharedConfigs,
     broker: AsyncBroker,
     schedule_source: ScheduleSource,
     event_broker: RabbitBroker,
-    notification_config: NotificationConfig,
+    worker_configs: WorkerConfigs,
 ) -> dict[type, object]:
     """The context the worker's container is built from.
 
@@ -135,18 +178,20 @@ def make_worker_container_context(
     exist before tasks are registered on it, and the container is what the
     tasks resolve their dependencies from.
 
-    ``NotificationConfig`` enters the same way ``TelegramConfig`` does for the
-    bot — through the process that has one, never through the shared configs
-    bundle. A worker without it fails to build its container at startup, which
-    is the failure we want: the alternative is a worker that runs happily and
-    is silent about every order.
+    ``NotificationConfig`` and ``SiteApiConfig`` enter the same way
+    ``TelegramConfig`` does for the bot — through the process that has them,
+    never through the shared configs bundle. A worker without either fails to
+    build its container at startup, which is the failure we want: the
+    alternative is a worker that runs happily and is silent about every order,
+    or never refreshes the catalog.
     """
     return {
         **configs.as_context(),
         AsyncBroker: broker,
         ScheduleSource: schedule_source,
         RabbitBroker: event_broker,
-        NotificationConfig: notification_config,
+        NotificationConfig: worker_configs.notification,
+        SiteApiConfig: worker_configs.site_api,
     }
 
 

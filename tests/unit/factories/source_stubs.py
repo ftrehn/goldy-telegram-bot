@@ -18,6 +18,9 @@ from goldy.setup.bootstrap.sources.rabbitmq_env_source_factory import (
 from goldy.setup.bootstrap.sources.redis_env_source_factory import (
     RedisEnvSourceFactory,
 )
+from goldy.setup.bootstrap.sources.site_api_env_source_factory import (
+    SiteApiEnvSourceFactory,
+)
 from goldy.setup.bootstrap.sources.taskiq_env_source_factory import (
     TaskIQEnvSourceFactory,
 )
@@ -30,6 +33,7 @@ from tests.unit.factories.env_data_factories import (
     postgres_env,
     rabbitmq_env,
     redis_env,
+    site_api_env,
     sqlalchemy_env,
     taskiq_env,
     telegram_env,
@@ -95,4 +99,12 @@ def catalog_source_stub(**overrides: str) -> StubSourceFactory:
     return StubSourceFactory.mirroring(
         CatalogEnvSourceFactory(),
         catalog_env(**overrides),
+    )
+
+
+def site_api_source_stub(**overrides: str) -> StubSourceFactory:
+    """In-memory stub serving a valid site API setup; override any key."""
+    return StubSourceFactory.mirroring(
+        SiteApiEnvSourceFactory(),
+        site_api_env(**overrides),
     )

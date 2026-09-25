@@ -19,11 +19,9 @@ RETRY_DELAY_SECONDS: Final[int] = 60
 """Two more attempts a minute apart, then wait for the next tick.
 
 A pass that failed leaves nothing half-swept — finalisation runs only after
-the last page — so there is no urgency to retry harder. What matters is that
-retries finish well inside the cron interval: two passes running at once would
-each finalise over the other's batch id, and the one that finishes first
-would sweep rows the other had just restamped. The schedule and this policy
-keep that from happening; nothing else does.
+the last page — so there is no urgency to retry harder. Overlap is not this
+policy's job: ``CatalogSyncLock`` lets one pass run at a time, and a retry that
+lands while another pass is running is skipped rather than raised.
 """
 
 
@@ -35,6 +33,10 @@ async def sync_catalog_task(synchronizer: FromDishka[CatalogSynchronizer]) -> No
     being pushed to — it has no public address to be pushed to. The pass
     imports batch by batch and finalises only after all of them; a failure on
     the way raises, taskiq retries, and the projection keeps what it had.
+
+    A pass that finds another one running returns quietly: the synchronizer
+    has logged it, and raising would turn one skipped tick into a retry storm
+    against the pass that is doing the work.
     """
     await synchronizer.run()
 

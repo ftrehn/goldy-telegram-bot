@@ -485,8 +485,15 @@ Read the relevant entry before touching that area.
 - **Finalise only after the whole pass.** Each batch commits on its own; a
   sweep after a partial pass deactivates every product the missing pages held.
   `CatalogSynchronizer` finalises the scopes `CatalogPull` declared, and only
-  when the batch stream ended without an error. Two passes running at once
-  sweep each other's rows — only the schedule prevents that, there is no lock.
+  when the batch stream ended without an error.
+- **One pass at a time.** Two overlapping passes sweep each other's rows —
+  the first to finish deletes what the other just restamped. The whole pass
+  runs under `CatalogSyncLock`, a Postgres session-level advisory lock on a
+  connection of its own (`PostgresCatalogSyncLock`); a pass that finds it
+  taken logs and returns `None`, and the task does not raise — raising would
+  only retry into the running pass. The connection goes back to the pool only
+  unlocked; a failed unlock invalidates it, which ends the session and frees
+  the lock.
 - **Never invent `source_changed_at`.** A stamp older than the stored one makes
   the upsert skip the row without restamping its `batch_id`, and the next
   finalisation sweeps it. The site has no reliable stamps, so rows carry `null`.

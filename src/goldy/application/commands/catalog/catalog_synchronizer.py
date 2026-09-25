@@ -9,7 +9,7 @@ from goldy.application.commands.catalog.import_catalog.command import (
     ImportCatalogCommand,
 )
 from goldy.application.common.mediator.sender import Sender
-from goldy.application.common.ports.catalog import CatalogSource
+from goldy.application.common.ports.catalog import CatalogSource, CatalogSyncLock
 from goldy.application.error import CatalogSnapshotError
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
@@ -53,17 +53,49 @@ class CatalogSynchronizer:
     ``Sender`` rather than the handlers: each command still goes through the
     transaction and events pipelines like any other.
 
+    **One pass at a time, across every process.** Two overlapping passes
+    finalise by different batch ids, and the first to finish sweeps the rows
+    the other has just restamped. The whole pass therefore runs inside
+    ``CatalogSyncLock``; a pass that finds the lock taken logs, returns
+    ``None`` and does nothing — the running pass brings the same catalog, and
+    raising would only feed taskiq's retries into the next collision.
+
     Shared by the worker's scheduled pull and the seeder's file, which is what
     keeps the file path an honest rehearsal of the real one. It lives next to
     the commands it sends because both of its callers are allowed to reach
     ``application.commands`` and nothing else in between should.
     """
 
-    def __init__(self, catalog_source: CatalogSource, sender: Sender) -> None:
+    def __init__(
+        self,
+        catalog_source: CatalogSource,
+        sender: Sender,
+        catalog_sync_lock: CatalogSyncLock,
+    ) -> None:
         self._catalog_source: Final[CatalogSource] = catalog_source
         self._sender: Final[Sender] = sender
+        self._lock: Final[CatalogSyncLock] = catalog_sync_lock
 
-    async def run(self) -> CatalogSyncReport:
+    async def run(self) -> CatalogSyncReport | None:
+        """Runs one pass under the lock, or nothing if another pass holds it.
+
+        Returns:
+            The report of the pass, or ``None`` when it was skipped because
+            another pass is running.
+
+        Raises:
+            AppError: the lock could not be asked for; no pass ran.
+            CatalogSourceError: see :meth:`_run`.
+            CatalogSnapshotError: see :meth:`_run`.
+        """
+        async with self._lock.hold() as acquired:
+            if not acquired:
+                logger.info("catalog_sync: another pass is running, this one skipped")
+                return None
+
+            return await self._run()
+
+    async def _run(self) -> CatalogSyncReport:
         """Imports every batch of one pass, then finalises the scopes it covers.
 
         Raises:

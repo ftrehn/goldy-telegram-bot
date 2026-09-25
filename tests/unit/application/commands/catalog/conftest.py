@@ -9,7 +9,11 @@ from goldy.application.commands.catalog.import_catalog.handler import (
     ImportCatalogHandler,
 )
 from tests.unit.factories.shop_factories import make_price_type_id
-from tests.unit.stubs.catalog import CatalogCommandSender, RecordingCatalogProjectionDao
+from tests.unit.stubs.catalog import (
+    CatalogCommandSender,
+    RecordingCatalogProjectionDao,
+    StubCatalogSyncLock,
+)
 
 
 @pytest.fixture()
@@ -38,3 +42,8 @@ def catalog_command_sender(
     finalize_catalog_import_handler: FinalizeCatalogImportHandler,
 ) -> CatalogCommandSender:
     return CatalogCommandSender(import_catalog_handler, finalize_catalog_import_handler)
+
+
+@pytest.fixture()
+def catalog_sync_lock() -> StubCatalogSyncLock:
+    return StubCatalogSyncLock()

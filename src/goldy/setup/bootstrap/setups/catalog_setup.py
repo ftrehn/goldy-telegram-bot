@@ -34,6 +34,13 @@ async def seed_catalog(container: AsyncContainer, path: Path) -> None:
         synchronizer = await request_scope.get(CatalogSynchronizer)
         report = await synchronizer.run()
 
+    if report is None:
+        logger.warning(
+            "seed_catalog: file=%s not imported — a catalog pass is running; retry",
+            path,
+        )
+        return
+
     logger.info(
         "seed_catalog: file=%s batch=%s accepted=%d discarded=%d swept=%d",
         path,

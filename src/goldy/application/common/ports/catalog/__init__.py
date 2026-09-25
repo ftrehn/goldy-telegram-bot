@@ -12,6 +12,7 @@ from .catalog_snapshot import (
     StockRow,
 )
 from .catalog_source import CatalogPull, CatalogSource
+from .catalog_sync_lock import CatalogSyncLock
 from .pricing_reader import CartPrices, PricingReader, ResolvedPriceType
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "CatalogScopeKind",
     "CatalogSnapshot",
     "CatalogSource",
+    "CatalogSyncLock",
     "CategoryRow",
     "PriceRow",
     "PriceTypeBindingRow",

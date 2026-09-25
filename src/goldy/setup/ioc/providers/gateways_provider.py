@@ -10,6 +10,7 @@ from goldy.application.common.ports.carts import (
 from goldy.application.common.ports.catalog import (
     CatalogProjectionDao,
     CatalogQueryGateway,
+    CatalogSyncLock,
     PricingReader,
 )
 from goldy.application.common.ports.orders import (
@@ -31,6 +32,9 @@ from goldy.infrastructure.adapters.auth.static_admin_registry import StaticAdmin
 from goldy.infrastructure.adapters.outbox.outbox_event_bus import OutboxEventBus
 from goldy.infrastructure.adapters.outbox.retort_event_serializer import (
     RetortEventSerializer,
+)
+from goldy.infrastructure.adapters.persistence.postgres_catalog_sync_lock import (
+    PostgresCatalogSyncLock,
 )
 from goldy.infrastructure.adapters.persistence.sqlalchemy_cart_command_gateway import (
     SqlAlchemyCartCommandGateway,
@@ -125,6 +129,11 @@ def gateways_provider() -> Provider:
     provider.provide(source=SqlAlchemyCatalogQueryGateway, provides=CatalogQueryGateway)
     provider.provide(source=SqlAlchemyPricingReader, provides=PricingReader)
     provider.provide(source=SqlAlchemyCatalogProjectionDao, provides=CatalogProjectionDao)
+    provider.provide(
+        source=PostgresCatalogSyncLock,
+        provides=CatalogSyncLock,
+        scope=Scope.APP,
+    )
 
     provider.provide(source=SqlAlchemyCartCommandGateway, provides=CartCommandGateway)
     provider.provide(source=SqlAlchemyCartQueryGateway, provides=CartQueryGateway)

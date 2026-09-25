@@ -13,7 +13,7 @@ notice if one of them were narrowed to a specific subclass one day.
 from typing import Final, cast, final
 
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 CONNECTION_LOST: Final[str] = "server closed the connection unexpectedly"
 
@@ -52,3 +52,65 @@ class FailingSession:
 def failing_session() -> AsyncSession:
     """The stub under the type an adapter's constructor asks for."""
     return cast("AsyncSession", FailingSession())
+
+
+@final
+class _ScalarResult:
+    def __init__(self, value: object) -> None:
+        self._value = value
+
+    def scalar_one(self) -> object:
+        return self._value
+
+
+@final
+class LockConnection:
+    """Stands in for the ``AsyncConnection`` the advisory lock is held on.
+
+    Answers ``pg_try_advisory_lock`` with ``lock_granted`` and records the
+    statements it saw, so a test can tell an unlock from a bare close. Setting
+    ``fail_unlock`` makes the unlock fail the way a dropped connection does.
+    """
+
+    def __init__(self, *, lock_granted: bool = True, fail_unlock: bool = False) -> None:
+        self.lock_granted = lock_granted
+        self.fail_unlock = fail_unlock
+        self.statements: list[str] = []
+        self.invalidated = False
+        self.closed = False
+
+    async def execute(self, statement: object, _params: object = None) -> _ScalarResult:
+        sql = str(statement)
+        self.statements.append(sql)
+        if "unlock" in sql and self.fail_unlock:
+            raise _failure()
+        return _ScalarResult(self.lock_granted)
+
+    async def commit(self) -> None:
+        return None
+
+    async def invalidate(self) -> None:
+        self.invalidated = True
+
+    async def close(self) -> None:
+        self.closed = True
+
+    @property
+    def unlocked(self) -> bool:
+        return any("pg_advisory_unlock" in sql for sql in self.statements)
+
+
+@final
+class LockEngine:
+    """Hands out one :class:`LockConnection`, or fails to connect at all."""
+
+    def __init__(self, connection: LockConnection | None = None) -> None:
+        self.connection = connection
+
+    async def connect(self) -> LockConnection:
+        if self.connection is None:
+            raise _failure()
+        return self.connection
+
+    def as_engine(self) -> AsyncEngine:
+        return cast("AsyncEngine", self)

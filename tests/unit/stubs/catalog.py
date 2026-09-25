@@ -12,6 +12,7 @@ that reimplemented it would prove nothing about the handler that calls it.
 """
 
 from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import cast, final, override
 
@@ -37,6 +38,7 @@ from goldy.application.common.ports.catalog import (
     CatalogScope,
     CatalogSnapshot,
     CatalogSource,
+    CatalogSyncLock,
     CategoryRow,
     PriceRow,
     PriceTypeBindingRow,
@@ -377,3 +379,34 @@ class CatalogCommandSender(Sender):
 
         msg = f"{type(request).__name__} is not a catalog command."
         raise AssertionError(msg)
+
+
+@final
+class StubCatalogSyncLock(CatalogSyncLock):
+    """A pass lock a test can declare taken, and that counts its releases.
+
+    ``taken_elsewhere`` plays a second pass already holding the lock. What a
+    test reads back is whether the block ran under the lock and whether the
+    lock was given back — including when the block raised.
+    """
+
+    def __init__(self) -> None:
+        self.taken_elsewhere = False
+        self.held = False
+        self.acquisitions = 0
+        self.releases = 0
+
+    @override
+    @asynccontextmanager
+    async def hold(self) -> AsyncIterator[bool]:
+        if self.taken_elsewhere:
+            yield False
+            return
+
+        self.held = True
+        self.acquisitions += 1
+        try:
+            yield True
+        finally:
+            self.held = False
+            self.releases += 1

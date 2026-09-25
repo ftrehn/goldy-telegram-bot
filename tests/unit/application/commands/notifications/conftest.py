@@ -15,6 +15,9 @@ from uuid import UUID
 import pytest
 
 from goldy.application.commands.notifications.dispatcher import NotificationDispatcher
+from goldy.application.commands.notifications.notify_handover_rejected.handler import (
+    NotifyOrderHandoverRejectedHandler,
+)
 from goldy.application.commands.notifications.notify_order_address.handler import (
     NotifyDeliveryAddressChangedHandler,
 )
@@ -128,6 +131,15 @@ def notify_address_changed(
     dispatcher: NotificationDispatcher,
 ) -> NotifyDeliveryAddressChangedHandler:
     return NotifyDeliveryAddressChangedHandler(inbox, users, dispatcher)
+
+
+@pytest.fixture()
+def notify_handover_rejected(
+    inbox: InMemoryInboxGateway,
+    users: InMemoryUserQueryGateway,
+    dispatcher: NotificationDispatcher,
+) -> NotifyOrderHandoverRejectedHandler:
+    return NotifyOrderHandoverRejectedHandler(inbox, users, dispatcher)
 
 
 @pytest.fixture()

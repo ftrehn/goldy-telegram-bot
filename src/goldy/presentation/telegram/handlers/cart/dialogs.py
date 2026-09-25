@@ -52,6 +52,11 @@ CART_DIALOG: Final[Dialog] = Dialog(
         I18NFormat(text_keys.CART_SCREEN_EMPTY, when="is_empty"),
         I18NFormat(text_keys.CART_UNAVAILABLE_NOTICE, when="has_unavailable"),
         I18NFormat(text_keys.CART_UNPRICED_NOTICE, when="has_unpriced"),
+        I18NFormat(text_keys.CART_PERSONAL_PRICES_NOTICE, when="personal_prices"),
+        I18NFormat(
+            text_keys.CART_PERSONAL_UNAVAILABLE_NOTICE,
+            when="personal_unavailable",
+        ),
         Group(
             Select(
                 Format("{item[label]}"),

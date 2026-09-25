@@ -128,12 +128,13 @@ def load_notification_config() -> NotificationConfig:
 
 
 def load_site_api_config() -> SiteApiConfig:
-    """Read only by the worker and the scheduler — where the catalog comes from.
+    """Read by the bot, the worker and the scheduler — how the site is reached.
 
-    Kept out of :class:`SharedConfigs` for the reason the notification token
-    is: the bundle reaches every process, and the site token has no business
-    in the bot's. The scheduler reads it because it builds the worker's broker,
-    and the catalog pull's schedule is declared on that broker.
+    Kept out of :class:`SharedConfigs` all the same, because the seeder is a
+    process too and has no business holding the site token. The bot needs it
+    to link people, price them and read their finance (ADR-0004); the worker
+    to pull the catalog and hand orders over; the scheduler because it builds
+    the worker's broker, and the schedules are declared on that broker.
     """
     return SiteApiConfigLoader(SiteApiEnvSourceFactory()).load()
 
@@ -199,15 +200,19 @@ def make_telegram_container_context(
     configs: SharedConfigs,
     telegram_config: TelegramConfig,
     bot: Bot,
+    site_api_config: SiteApiConfig,
 ) -> dict[type, object]:
     """The context the bot's container is built from.
 
     The ``Bot`` is here for the same reason: aiogram needs it to build the
     dispatcher, which is then wired to the container it could not have come
-    from.
+    from. ``SiteApiConfig`` enters the way the worker's does — through the
+    process that holds it — because the bot asks the site on a person's
+    behalf: linking, personal prices, finance, cancelling a handed-over order.
     """
     return {
         **configs.as_context(),
         TelegramConfig: telegram_config,
         Bot: bot,
+        SiteApiConfig: site_api_config,
     }

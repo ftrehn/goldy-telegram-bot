@@ -9,6 +9,7 @@ from goldy.application.common.ports.notifications import (
     Notification,
     NotificationRenderer,
     OrderDeliveryAddressChangedNotification,
+    OrderHandoverRejectedNotification,
     OrderPlacedNotification,
     OrderStatusChangedNotification,
 )
@@ -146,6 +147,11 @@ def _wording(notification: Notification) -> tuple[str, FluentArguments]:
                 "number": notification.number,
                 "old_address": notification.old_address,
                 "new_address": notification.new_address,
+            }
+        case OrderHandoverRejectedNotification():
+            return text_keys.NOTIFICATION_ORDER_HANDOVER_REJECTED, {
+                "number": notification.number,
+                "code": notification.code,
             }
         case _:
             msg = f"No wording for {type(notification).__name__}."

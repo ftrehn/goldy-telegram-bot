@@ -1,5 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
+from enum import StrEnum
 
 from goldy.application.common.views.money import MoneyView
 
@@ -42,6 +43,21 @@ class CartLineView:
         return self.stock is not None and self.stock > 0
 
 
+class PriceBasis(StrEnum):
+    """Whose prices a cart is drawn at.
+
+    ``RETAIL`` — the guest catalog, as for anybody not linked to the site.
+    ``PERSONAL`` — the site priced it for the linked customer's terms.
+    ``PERSONAL_UNAVAILABLE`` — the customer is linked, the site did not
+    answer, and the numbers on the screen are retail; the screen must say so,
+    and checkout will refuse until the site answers.
+    """
+
+    RETAIL = "retail"
+    PERSONAL = "personal"
+    PERSONAL_UNAVAILABLE = "personal_unavailable"
+
+
 @dataclass(frozen=True, slots=True)
 class CartView:
     """The cart screen, whether or not the customer has a cart row yet.
@@ -55,6 +71,7 @@ class CartView:
 
     lines: tuple[CartLineView, ...]
     total: MoneyView
+    price_basis: PriceBasis = field(default=PriceBasis.RETAIL)
 
     @property
     def is_empty(self) -> bool:

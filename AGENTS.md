@@ -8,8 +8,10 @@ site's contract is `docs/API.md` in the site repository.
 
 **The catalog is read-only.** It comes from the site; customers, orders and
 everything else belong to this service. There is no counterparty and no 1C
-concept inside the domain. Handing orders over to the site and reading their
-statuses back is the decided next phase (ADR-0004), not yet built.
+concept inside the domain. Orders are handed over to the site through the
+outbox and their statuses read back from the site's order feed; a person links
+their site account with a one-time code and then sees the prices the site
+computes for them and their company's balances (ADR-0004).
 
 ## Project structure
 
@@ -324,8 +326,12 @@ do not merge the groups to make a wiring error go away.
 identity. It carries the Bot API client and the token behind it, and only the
 worker gets it: the bot answers whoever wrote to it, while the worker writes to
 people who did not. `site_api_provider` is the same again for the site token:
-the HTTP client, the site-backed `CatalogSource` and the `CatalogSynchronizer`
-the `sync_catalog` task runs. `configs_provider` still hands `TelegramConfig`,
+the HTTP client and the four customer-facing site ports (linking, prices,
+finance, orders). Unlike the notification token, the bot gets it too — linking,
+personal prices and `/finance` are answers to the person writing. What only the
+worker gets is `site_sync_provider`: the site-backed `CatalogSource`, the
+`CatalogSynchronizer` the `sync_catalog` task runs and the `OrderHandoverRunner`
+behind the handover and status-feed tasks. `configs_provider` still hands `TelegramConfig`,
 `NotificationConfig` and `SiteApiConfig` to nobody — each process contributes
 its own.
 
@@ -494,6 +500,19 @@ Read the relevant entry before touching that area.
   only retry into the running pass. The connection goes back to the pool only
   unlocked; a failed unlock invalidates it, which ends the session and frees
   the lock.
+- **An order reaches the site through the handover table, not the inbox.**
+  `OrderPlaced` is consumed twice (the staff notification and the handover), and
+  both consumers claiming one inbox row would let only one of them run. The
+  handover consumer only schedules a row — its primary key is the idempotency —
+  and a cron task sends due rows with backoff. Sending straight from the
+  consumer would turn every site outage into a hot redelivery loop.
+- **A cancellation and a handover of one order serialise on `FOR UPDATE`.**
+  `CancelOrderHandler` locks the handover row: a pending one is withdrawn and
+  never sent, an accepted one is cancelled on the site first. Without the lock
+  the site could take an order the customer had just cancelled in the bot.
+- **Site statuses move a bot order forward only.** The feed overlaps itself by
+  five minutes on purpose, so the same status arrives more than once; a status
+  behind the order's own is ignored rather than refused.
 - **Never invent `source_changed_at`.** A stamp older than the stored one makes
   the upsert skip the row without restamping its `batch_id`, and the next
   finalisation sweeps it. The site has no reliable stamps, so rows carry `null`.

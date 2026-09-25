@@ -14,10 +14,12 @@ from .catalog_search import (
 )
 from .inbox import inbox_messages_table
 from .order import map_orders_table, order_items_table, orders_table
+from .order_handover import order_handovers_table
 from .outbox import map_outbox_table
 from .user import (
     map_users_table,
     messenger_accounts_table,
+    user_site_links_table,
     users_table,
 )
 
@@ -39,7 +41,9 @@ __all__ = [
     "messenger_accounts_table",
     "normalize_name",
     "normalize_sku",
+    "order_handovers_table",
     "order_items_table",
     "orders_table",
+    "user_site_links_table",
     "users_table",
 ]

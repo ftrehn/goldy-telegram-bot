@@ -23,6 +23,7 @@ import pytest
 from goldy.application.common.ports.notifications import (
     Notification,
     OrderDeliveryAddressChangedNotification,
+    OrderHandoverRejectedNotification,
     OrderPlacedNotification,
     OrderStatusChangedNotification,
 )
@@ -59,6 +60,7 @@ NOTIFICATIONS: Final[tuple[Notification, ...]] = (
         old_address="Москва, Ленина 1",
         new_address="Санкт-Петербург, Невский 20",
     ),
+    OrderHandoverRejectedNotification(number="240913-3K7QXA", code="prices_changed"),
 )
 """One of every kind of notification a handler can build, fully filled in.
 
@@ -140,6 +142,27 @@ def test_a_cancellation_reason_is_printed_and_its_absence_is_not(
 
     assert "Товара нет на складе" in with_reason
     assert "Причина" not in without_reason
+
+
+def test_a_handover_refusal_names_the_order_and_translates_the_known_reason() -> None:
+    rendered = FluentNotificationRenderer(NOTIFICATION_LOCALES_PATH).render(
+        OrderHandoverRejectedNotification(number="240913-3K7QXA", code="prices_changed"),
+        "ru",
+    )
+
+    assert "240913-3K7QXA" in rendered
+    assert "цены изменились" in rendered
+
+
+def test_a_handover_refusal_with_an_unknown_site_code_prints_it_as_it_came() -> None:
+    rendered = FluentNotificationRenderer(NOTIFICATION_LOCALES_PATH).render(
+        OrderHandoverRejectedNotification(
+            number="240913-3K7QXA", code="brand_new_refusal"
+        ),
+        "ru",
+    )
+
+    assert "brand_new_refusal" in rendered
 
 
 def test_both_languages_define_exactly_the_same_messages() -> None:

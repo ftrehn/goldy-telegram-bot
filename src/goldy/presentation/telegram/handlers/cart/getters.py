@@ -6,7 +6,7 @@ from dishka import FromDishka
 from dishka.integrations.aiogram_dialog import inject
 
 from goldy.application.common.mediator.sender import Sender
-from goldy.application.common.views.cart import CartLineView
+from goldy.application.common.views.cart import CartLineView, PriceBasis
 from goldy.application.queries.carts.get_cart.query import GetCartQuery
 from goldy.domain.common.values.quantity import MAX_QUANTITY
 from goldy.presentation.telegram.common import text_keys
@@ -133,9 +133,12 @@ async def cart_getter(
         "is_empty": cart.is_empty,
         "has_unavailable": cart.has_unavailable_lines,
         "has_unpriced": cart.has_unpriced_lines,
+        "personal_prices": cart.price_basis is PriceBasis.PERSONAL,
+        "personal_unavailable": cart.price_basis is PriceBasis.PERSONAL_UNAVAILABLE,
         "can_checkout": not cart.is_empty
         and not cart.has_unavailable_lines
-        and not cart.has_unpriced_lines,
+        and not cart.has_unpriced_lines
+        and cart.price_basis is not PriceBasis.PERSONAL_UNAVAILABLE,
         PAGES_KEY: paging[PAGES_KEY],
     }
 

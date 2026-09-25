@@ -68,3 +68,21 @@ class UserBlocked(Event):
 @dataclass(frozen=True, slots=True, kw_only=True)
 class UserUnblocked(Event):
     user_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SiteAccountLinked(Event):
+    """The person linked themselves to their customer account on the site.
+
+    Carries no name and no company: the event travels through the outbox and
+    a queue, and whoever needs to know whom they linked to reads the user.
+    """
+
+    user_id: UUID
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SiteAccountUnlinked(Event):
+    """The link to the site's customer account is gone, on either side's word."""
+
+    user_id: UUID

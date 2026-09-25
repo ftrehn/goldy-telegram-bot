@@ -1,8 +1,13 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final, final
 
 from goldy.application.common.ports.catalog import PricingReader
+from goldy.application.common.services.personal_pricing import (
+    PERSONAL_PRICE_TYPE_ID,
+    PersonalPrices,
+    PersonalPricingService,
+)
 from goldy.application.common.services.price_type_resolver import PriceTypeResolver
 from goldy.application.error import ProductNotPricedError
 from goldy.domain.carts.entities.cart import Cart
@@ -66,15 +71,22 @@ class CartPricingService:
     every command gateway, so this service has one job: ask for the price
     list of the cart's owner, ask for the prices, and refuse a cart the
     catalog lists but does not price.
+
+    A customer linked to the site is priced by the site (ADR-0004): the
+    projection still supplies names, articles and units, and the site the
+    price by that customer's terms. The order then records
+    ``PERSONAL_PRICE_TYPE_ID`` so it says where its numbers came from.
     """
 
     def __init__(
         self,
         price_type_resolver: PriceTypeResolver,
         pricing_reader: PricingReader,
+        personal_pricing: PersonalPricingService,
     ) -> None:
         self._price_type_resolver: Final[PriceTypeResolver] = price_type_resolver
         self._pricing_reader: Final[PricingReader] = pricing_reader
+        self._personal_pricing: Final[PersonalPricingService] = personal_pricing
 
     async def for_cart(self, cart: Cart) -> CartPricing:
         """Reads the current price of everything in the cart, for its owner.
@@ -94,7 +106,12 @@ class CartPricingService:
             ProductNotPricedError: the catalog still has a product but has no
                 price for it under this price list — the storefront shows it
                 as "price on request", which is a fine state to browse in and
-                an impossible one to order from.
+                an impossible one to order from. For a customer linked to the
+                site, also a product the site will not sell to them.
+            SiteUnavailableError: the customer is linked to the site and the
+                site did not answer. Their order cannot be priced by their
+                terms, and pricing it at retail without saying so is worse
+                than asking them to try again in a minute.
         """
         price_type_id = await self._price_type_resolver.resolve_for(cart.user_id)
         prices = await self._pricing_reader.read_cart_prices(
@@ -107,7 +124,48 @@ class CartPricingService:
             msg = f"Products have no price under this price type: {named}."
             raise ProductNotPricedError(msg)
 
-        return CartPricing(
-            price_type_id=price_type_id,
-            priced_products=prices.priced_products,
+        personal = await self._personal_pricing.for_user(
+            cart.user_id,
+            [(line.product_id, line.quantity) for line in cart.lines],
         )
+
+        if personal is None:
+            return CartPricing(
+                price_type_id=price_type_id,
+                priced_products=prices.priced_products,
+            )
+
+        return CartPricing(
+            price_type_id=PERSONAL_PRICE_TYPE_ID,
+            priced_products=self._reprice(prices.priced_products, personal),
+        )
+
+    @staticmethod
+    def _reprice(
+        priced_products: Sequence[PricedProduct],
+        personal: PersonalPrices,
+    ) -> Sequence[PricedProduct]:
+        """The catalog's snapshot of each product at the site's price for them.
+
+        Names, articles and units stay the projection's — the site answers
+        with prices only — so the order line reads the same as the cart did.
+
+        Raises:
+            ProductNotPricedError: the site will not sell one of them.
+        """
+        repriced: list[PricedProduct] = []
+        refused: list[str] = []
+
+        for priced in priced_products:
+            unit_price = personal.price_of(priced.product_id)
+
+            if unit_price is None:
+                refused.append(str(priced.product_id))
+            else:
+                repriced.append(replace(priced, unit_price=unit_price))
+
+        if refused:
+            msg = f"The site will not price these for the customer: {', '.join(refused)}."
+            raise ProductNotPricedError(msg)
+
+        return repriced

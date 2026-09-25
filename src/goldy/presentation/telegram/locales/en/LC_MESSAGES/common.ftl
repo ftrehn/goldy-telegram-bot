@@ -68,6 +68,7 @@ command-cart = Your cart
 command-orders = Your orders
 command-me = Your profile
 command-help = What this bot can do
+command-finance = Company finances
 
 start-welcome = Hello, { $name }! You are registered.
 start-welcome-back = Welcome back, { $name }!
@@ -79,6 +80,7 @@ help-customer =
     /search — search by name or article
     /cart — your cart
     /orders — your orders
+    /finance — company finances (once the site is linked)
     /me — my profile
     /help — this help
 help-staff =
@@ -88,6 +90,7 @@ help-staff =
     /search — search by name or article
     /cart — your cart
     /orders — your orders
+    /finance — company finances (once the site is linked)
     /me — my profile
     /help — this help
 
@@ -151,3 +154,48 @@ admin-prev-button = ← Previous
 admin-next-button = Next →
 admin-block-reason-prompt = Send the reason. Whoever lifts the block will read it.
 admin-role-prompt = Pick a role. Administrator cannot be granted through the bot.
+
+# The link to the site account (ADR-0004). The refusals go through ERROR_TEXTS
+# and carry no placeholder, for the same reason as the buying flow's.
+site-unavailable = The site is not answering right now. Please try again in a few minutes.
+site-not-linked =
+    Your site account is not linked. On tkgoldy.ru open "Account → Messengers"
+    and press "Link Telegram" — the bot will open by itself.
+site-link-code-invalid = That linking link has expired or was already used. Get a new one in your account on the site.
+site-link-forbidden = This site account cannot be linked to the bot. Please write to a manager.
+site-customer-not-linked = The site no longer knows your link — it was removed in your account. Link it again.
+site-finance-denied = Your company's finances are not available to you: that takes an approved company and a director's or accountant's role.
+site-order-rejected = The site did not accept that change to the order. Please write to a manager.
+site-order-not-cancellable = The order is already being worked on — only a manager can cancel it now.
+
+site-link-preview =
+    <b>Link the site account?</b>
+
+    { $who }
+
+    Once linked, the bot shows your wholesale prices, orders and company finances.
+    If this is not you, press "Cancel".
+site-link-confirm-button = Yes, that is me
+site-link-cancel-button = Cancel
+site-link-done =
+    Done: the bot is linked to { $who }. The prices in the catalog and the cart are now yours.
+site-link-cancelled = Linking cancelled.
+site-link-after-registration = One step left: confirm the link to your site account.
+
+profile-site-linked =
+    Site: { $who }
+profile-site-not-linked = Site: not linked. Wholesale prices and finances come after linking in your account on tkgoldy.ru.
+profile-site-unlink-button = Unlink the site account
+profile-site-unlink-prompt = Unlink the site account? The bot goes back to retail prices and finances become unavailable.
+profile-site-unlinked-toast = The site account is unlinked.
+
+finance-title = <b>Finances — { $company }</b>
+finance-no-erp = The company is not matched with the accounting system yet — there are no figures. A manager will tell you.
+finance-debt = Debt: { $amount }
+finance-advance = Advance: { $amount }
+finance-overdue = Overdue: { $amount }, up to { $days } days
+finance-credit-limit = Credit limit: { $limit }, available { $available }
+finance-credit-untracked = The accounting system keeps no credit limit.
+finance-stale = ⚠ The accounting system did not answer — figures as of { $as_of }.
+finance-partial = ⚠ Not every partner of the company answered — the sum is incomplete.
+finance-footer = Shipments, payments and the reconciliation statement are in your account on the site.

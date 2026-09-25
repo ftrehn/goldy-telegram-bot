@@ -1,5 +1,6 @@
 import pytest
 
+from goldy.domain.users.entities.site_link import SiteLink
 from goldy.domain.users.errors import (
     LastMessengerAccountError,
     MessengerAccountNotLinkedError,
@@ -272,6 +273,83 @@ def test_an_account_is_recognised_by_platform_and_id_together() -> None:
 
     assert user.has_account(MessengerPlatform.TELEGRAM, telegram_id) is True
     assert user.has_account(MessengerPlatform.MAX, telegram_id) is False
+
+
+def test_a_freshly_registered_user_is_not_linked_to_the_site() -> None:
+    user, _ = make_registered_user()
+
+    assert user.is_site_linked is False
+    assert user.site_link is None
+
+
+def test_linking_a_site_account_records_it() -> None:
+    user, collection = make_registered_user()
+    drain(collection)
+    link = SiteLink.from_site(
+        customer_name="Иван Иванов",
+        company_name="Ромашка",
+        is_wholesale=True,
+    )
+
+    user.link_site_account(link)
+
+    assert user.site_link is link
+    assert user.is_site_linked is True
+    assert emitted_event_names(collection) == ["SiteAccountLinked"]
+
+
+def test_linking_a_site_account_again_replaces_the_previous_one() -> None:
+    """The site has already said yes by the time this runs, so the bot follows.
+
+    The site allows one customer per subject, so a fresh link is never a
+    conflict to refuse here — it is what the site's own answer just became.
+    """
+    user, collection = make_registered_user()
+    user.link_site_account(
+        SiteLink.from_site(
+            customer_name="Иван Иванов", company_name=None, is_wholesale=False
+        ),
+    )
+    drain(collection)
+    new_link = SiteLink.from_site(
+        customer_name="Пётр Петров",
+        company_name="ИП Петров",
+        is_wholesale=True,
+    )
+
+    user.link_site_account(new_link)
+
+    assert user.site_link is new_link
+    assert emitted_event_names(collection) == ["SiteAccountLinked"]
+
+
+def test_unlinking_a_site_account_records_it() -> None:
+    user, collection = make_registered_user()
+    user.link_site_account(
+        SiteLink.from_site(
+            customer_name="Иван Иванов", company_name=None, is_wholesale=False
+        ),
+    )
+    drain(collection)
+
+    user.unlink_site_account()
+
+    assert user.site_link is None
+    assert user.is_site_linked is False
+    assert emitted_event_names(collection) == ["SiteAccountUnlinked"]
+
+
+def test_unlinking_a_site_account_that_was_never_linked_is_the_requested_outcome() -> (
+    None
+):
+    """Idempotent: the site answers the same for a link it never had."""
+    user, collection = make_registered_user()
+    drain(collection)
+
+    user.unlink_site_account()
+
+    assert user.site_link is None
+    assert emitted_event_names(collection) == []
 
 
 def test_the_full_lifecycle_records_its_events_in_order() -> None:

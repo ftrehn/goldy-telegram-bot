@@ -43,3 +43,16 @@ notification-order-address-changed =
 
     Было: { $old_address }
     Стало: { $new_address }
+
+notification-order-handover-rejected =
+    Заказ { $number } не передан на сайт: { $code ->
+        [prices_changed] цены изменились с момента оформления
+        [item_unavailable] позиции нет в продаже на сайте
+        [quantity_not_multiple] количество не кратно упаковке
+        [credit_limit_exceeded] не хватает кредитного лимита компании
+        [customer_not_linked] покупатель отвязал аккаунт сайта
+        [external_id_reused] на сайте уже есть заказ с этим номером
+        [rate_limited] сайт ограничил приём заказов
+       *[other] сайт ответил «{ $code }»
+    }.
+    Заказ остаётся в боте — оформите его на сайте или в 1С вручную.

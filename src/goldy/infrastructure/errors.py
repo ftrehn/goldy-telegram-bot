@@ -1,3 +1,5 @@
+from collections.abc import Mapping
+
 from goldy.application.error import CatalogSourceError
 from goldy.domain.common.error import AppError
 
@@ -129,7 +131,25 @@ class SiteApiRejectedError(SiteApiError):
     A token the site does not know, a scope the client lacks, a malformed
     request. Repeating it gets the same refusal, so a caller retrying this is
     only filling the site's log.
+
+    Attributes:
+        details: ``error.details`` of the envelope — which positions changed
+            price, why finance is refused — or an empty mapping when the site
+            sent none. Read by the adapter that knows the endpoint; this
+            class does not interpret it.
     """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status: int | None = None,
+        code: str | None = None,
+        request_id: str | None = None,
+        details: Mapping[str, object] | None = None,
+    ) -> None:
+        super().__init__(message, status=status, code=code, request_id=request_id)
+        self.details: Mapping[str, object] = details or {}
 
 
 class SiteApiResponseError(SiteApiError):

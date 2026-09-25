@@ -11,6 +11,7 @@ from sqlalchemy.orm import clear_mappers
 from goldy.setup.bootstrap.setups.admin_setup import seed_admins
 from goldy.setup.bootstrap.setups.configs_setup import (
     load_shared_configs,
+    load_site_api_config,
     load_telegram_config,
     make_telegram_container_context,
 )
@@ -53,6 +54,7 @@ async def create_bot() -> None:
 
     configs = load_shared_configs()
     telegram_config = load_telegram_config()
+    site_api_config = load_site_api_config()
 
     setup_map_tables()
 
@@ -70,7 +72,7 @@ async def create_bot() -> None:
     )
 
     container = make_telegram_container(
-        make_telegram_container_context(configs, telegram_config, bot),
+        make_telegram_container_context(configs, telegram_config, bot, site_api_config),
     )
 
     setup_dishka(container=container, router=dp, auto_inject=True)

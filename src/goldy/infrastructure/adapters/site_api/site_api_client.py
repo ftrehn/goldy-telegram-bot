@@ -27,6 +27,7 @@ from goldy.infrastructure.errors import (
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
 REQUEST_ID_HEADER: Final[str] = "X-Request-Id"
+CUSTOMER_HEADER: Final[str] = "X-Customer"
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,8 +75,53 @@ class SiteApiClient:
         self,
         path: str,
         params: Mapping[str, str | int] | None = None,
+        *,
+        customer: str | None = None,
     ) -> SiteApiResponse:
         """One GET, relative to the API root.
+
+        Raises:
+            SiteApiError: in one of the three flavours listed on the class.
+        """
+        return await self.request("GET", path, params=params, customer=customer)
+
+    async def post(
+        self,
+        path: str,
+        body: Mapping[str, object],
+        *,
+        customer: str | None = None,
+    ) -> SiteApiResponse:
+        """One POST with a JSON body, relative to the API root.
+
+        Raises:
+            SiteApiError: in one of the three flavours listed on the class.
+        """
+        return await self.request("POST", path, body=body, customer=customer)
+
+    async def delete(self, path: str) -> SiteApiResponse:
+        """One DELETE, relative to the API root.
+
+        Raises:
+            SiteApiError: in one of the three flavours listed on the class.
+        """
+        return await self.request("DELETE", path)
+
+    async def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, str | int] | None = None,
+        body: Mapping[str, object] | None = None,
+        customer: str | None = None,
+    ) -> SiteApiResponse:
+        """One request of any method, relative to the API root.
+
+        ``customer`` becomes ``X-Customer`` — the subject of a person the site
+        has linked to one of its customers — and is left off entirely when
+        there is none: a request without it is the guest storefront, which is
+        a different answer, not the same one for nobody in particular.
 
         Raises:
             SiteApiError: in one of the three flavours listed on the class.
@@ -86,30 +132,45 @@ class SiteApiClient:
             "Accept": "application/json",
             REQUEST_ID_HEADER: request_id,
         }
+        if customer is not None:
+            headers[CUSTOMER_HEADER] = customer
+
+        where = f"{method} {path}"
 
         try:
-            response = await self._http.get(path, params=params, headers=headers)
+            response = await self._http.request(
+                method,
+                path,
+                params=params,
+                json=body,
+                headers=headers,
+            )
         except httpx.TimeoutException as e:
-            msg = f"The site API did not answer GET {path} in time."
+            msg = f"The site API did not answer {where} in time."
             raise SiteApiUnavailableError(msg, request_id=request_id) from e
         except httpx.HTTPError as e:
-            msg = f"The site API could not be reached for GET {path}: {e}."
+            msg = f"The site API could not be reached for {where}: {e}."
             raise SiteApiUnavailableError(msg, request_id=request_id) from e
         except httpx.InvalidURL as e:
-            msg = f"GET {path} does not make a valid site API address: {e}."
+            msg = f"{where} does not make a valid site API address: {e}."
             raise SiteApiError(msg, request_id=request_id) from e
 
-        return _read(response, path, request_id)
+        return _read(response, where, request_id)
 
     async def paginate(
         self,
         path: str,
         *,
         limit: int,
+        params: Mapping[str, str | int] | None = None,
+        customer: str | None = None,
     ) -> AsyncIterator[SiteApiResponse]:
         """Every page of a cursor listing, fetched as the caller asks for it.
 
-        Follows ``meta.next_cursor`` until it is ``null``. A cursor the site
+        Follows ``meta.next_cursor`` until it is ``null``. ``params`` go on the
+        first request only: the site's cursor already remembers the listing it
+        was cut from, and repeating a filter beside it is at best redundant and
+        at worst a different listing. A cursor the site
         hands back twice is refused rather than followed, because following it
         is a loop that never ends and imports the same page forever.
 
@@ -120,11 +181,13 @@ class SiteApiClient:
         seen: set[str] = set()
 
         while True:
-            params: dict[str, str | int] = {"limit": limit}
-            if cursor is not None:
-                params["cursor"] = cursor
+            query: dict[str, str | int] = {"limit": limit}
+            if cursor is None:
+                query.update(params or {})
+            else:
+                query["cursor"] = cursor
 
-            page = await self.get(path, params)
+            page = await self.get(path, query, customer=customer)
             yield page
 
             next_cursor = page.meta.get("next_cursor")
@@ -143,7 +206,7 @@ class SiteApiClient:
             cursor = next_cursor
 
 
-def _read(response: httpx.Response, path: str, request_id: str) -> SiteApiResponse:
+def _read(response: httpx.Response, where: str, request_id: str) -> SiteApiResponse:
     """Turns a response into the envelope's contents, or into the right error.
 
     Raises:
@@ -157,7 +220,7 @@ def _read(response: httpx.Response, path: str, request_id: str) -> SiteApiRespon
         or status >= HTTPStatus.INTERNAL_SERVER_ERROR
     ):
         code = _error_code(response)
-        msg = f"The site API answered GET {path} with {status} ({code or 'no code'})."
+        msg = f"The site API answered {where} with {status} ({code or 'no code'})."
         raise SiteApiUnavailableError(
             msg,
             status=status,
@@ -168,22 +231,26 @@ def _read(response: httpx.Response, path: str, request_id: str) -> SiteApiRespon
 
     if status >= HTTPStatus.BAD_REQUEST:
         code = _error_code(response)
-        msg = f"The site API refused GET {path} with {status} ({code or 'no code'})."
-        raise SiteApiRejectedError(msg, status=status, code=code, request_id=request_id)
+        msg = f"The site API refused {where} with {status} ({code or 'no code'})."
+        raise SiteApiRejectedError(
+            msg,
+            status=status,
+            code=code,
+            request_id=request_id,
+            details=_error_details(response),
+        )
 
     if status == HTTPStatus.NO_CONTENT:
         return SiteApiResponse(data=None, meta={}, request_id=request_id)
 
     if not HTTPStatus.OK <= status < HTTPStatus.MULTIPLE_CHOICES:
-        msg = (
-            f"The site API answered GET {path} with {status}, which is not the contract."
-        )
+        msg = f"The site API answered {where} with {status}, which is not the contract."
         raise SiteApiResponseError(msg, status=status, request_id=request_id)
 
-    return _envelope(response, path, request_id)
+    return _envelope(response, where, request_id)
 
 
-def _envelope(response: httpx.Response, path: str, request_id: str) -> SiteApiResponse:
+def _envelope(response: httpx.Response, where: str, request_id: str) -> SiteApiResponse:
     """The ``data`` and ``meta`` of a successful answer.
 
     Raises:
@@ -192,7 +259,7 @@ def _envelope(response: httpx.Response, path: str, request_id: str) -> SiteApiRe
     try:
         body = response.json()
     except ValueError as e:
-        msg = f"The site API answered GET {path} with a body that is not JSON."
+        msg = f"The site API answered {where} with a body that is not JSON."
         raise SiteApiResponseError(
             msg,
             status=response.status_code,
@@ -200,14 +267,14 @@ def _envelope(response: httpx.Response, path: str, request_id: str) -> SiteApiRe
         ) from e
 
     if not isinstance(body, dict) or "data" not in body:
-        msg = f"The site API answered GET {path} without a 'data' envelope."
+        msg = f"The site API answered {where} without a 'data' envelope."
         raise SiteApiResponseError(
             msg, status=response.status_code, request_id=request_id
         )
 
     meta = body.get("meta") or {}
     if not isinstance(meta, dict):
-        msg = f"The site API answered GET {path} with a 'meta' that is not an object."
+        msg = f"The site API answered {where} with a 'meta' that is not an object."
         raise SiteApiResponseError(
             msg, status=response.status_code, request_id=request_id
         )
@@ -215,13 +282,8 @@ def _envelope(response: httpx.Response, path: str, request_id: str) -> SiteApiRe
     return SiteApiResponse(data=body["data"], meta=meta, request_id=request_id)
 
 
-def _error_code(response: httpx.Response) -> str | None:
-    """The stable ``error.code`` of a refusal, if the body carries one.
-
-    Best effort by design: a 502 from the proxy in front of the site has an
-    HTML body, and failing to read a code must not replace the status error
-    with a parsing one.
-    """
+def _error_body(response: httpx.Response) -> Mapping[str, object] | None:
+    """The ``error`` object of a refusal, or ``None`` when the body has none."""
     try:
         body = response.json()
     except ValueError:
@@ -231,10 +293,25 @@ def _error_code(response: httpx.Response) -> str | None:
         return None
 
     error = body.get("error")
-    if not isinstance(error, dict):
-        return None
+    return error if isinstance(error, dict) else None
 
-    code = error.get("code")
+
+def _error_details(response: httpx.Response) -> Mapping[str, object]:
+    """``error.details`` of a refusal, empty when absent or not an object."""
+    error = _error_body(response)
+    details = None if error is None else error.get("details")
+    return details if isinstance(details, dict) else {}
+
+
+def _error_code(response: httpx.Response) -> str | None:
+    """The stable ``error.code`` of a refusal, if the body carries one.
+
+    Best effort by design: a 502 from the proxy in front of the site has an
+    HTML body, and failing to read a code must not replace the status error
+    with a parsing one.
+    """
+    error = _error_body(response)
+    code = None if error is None else error.get("code")
     return code if isinstance(code, str) and code else None
 
 

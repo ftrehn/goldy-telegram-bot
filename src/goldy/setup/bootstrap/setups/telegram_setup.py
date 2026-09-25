@@ -29,12 +29,13 @@ PUBLISHED_COMMANDS: Final[Mapping[str, str]] = {
     "search": text_keys.COMMAND_SEARCH,
     "cart": text_keys.COMMAND_CART,
     "orders": text_keys.COMMAND_ORDERS,
+    "finance": text_keys.COMMAND_FINANCE,
     "me": text_keys.COMMAND_ME,
     "help": text_keys.COMMAND_HELP,
 }
 """The menu Telegram draws beside the text box, in the order it draws it.
 
-Six commands and not seven. ``/manage_orders`` is deliberately absent, and its
+Seven commands and not eight. ``/manage_orders`` is deliberately absent, and its
 absence is the whole reason this mapping is written out rather than derived
 from the registered routers: ``help-staff`` exists so that a customer is never
 told staff commands are there, and a menu published to every private chat would

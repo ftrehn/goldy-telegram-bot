@@ -5,9 +5,13 @@ from aiogram.types import CallbackQuery, Message
 from aiogram_dialog import DialogManager
 from aiogram_dialog.widgets.input import MessageInput
 from aiogram_dialog.widgets.kbd import Button, Select
+from aiogram_i18n import I18nContext
 from dishka import FromDishka
 from dishka.integrations.aiogram_dialog import inject
 
+from goldy.application.commands.site.unlink_site_account.command import (
+    UnlinkSiteAccountCommand,
+)
 from goldy.application.commands.users.change_notification_preferences.command import (
     ChangeNotificationPreferencesCommand,
 )
@@ -21,6 +25,8 @@ from goldy.application.commands.users.unlink_messenger_account.command import (
 from goldy.application.common.mediator.sender import Sender
 from goldy.application.common.views.user import UserView
 from goldy.domain.users.values.messenger_platform import MessengerPlatform
+from goldy.presentation.telegram.common import text_keys
+from goldy.presentation.telegram.common.widgets import I18N_CONTEXT_KEY
 from goldy.presentation.telegram.handlers.profile.states import ProfileStates
 from goldy.presentation.telegram.middlewares.auth_middleware import USER_KEY
 
@@ -133,6 +139,25 @@ async def on_account_unlinked(
             platform=MessengerPlatform(item_id),
         ),
     )
+    await manager.switch_to(ProfileStates.MAIN)
+
+
+@inject
+async def on_site_unlinked(
+    callback: CallbackQuery,
+    _widget: Button,
+    manager: DialogManager,
+    sender: FromDishka[Sender],
+) -> None:
+    """Unlinks the site account, on the site first and then here.
+
+    Behind a confirmation window, because the step is not free to undo: the
+    person has to go back to the site's cabinet for a fresh code.
+    """
+    await sender.send(UnlinkSiteAccountCommand())
+
+    i18n: I18nContext = manager.middleware_data[I18N_CONTEXT_KEY]
+    await callback.answer(i18n.get(text_keys.PROFILE_SITE_UNLINKED_TOAST))
     await manager.switch_to(ProfileStates.MAIN)
 
 

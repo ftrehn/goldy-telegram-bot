@@ -63,12 +63,18 @@ def create_shared_configs(
     )
 
 
+def create_site_api_config() -> SiteApiConfig:
+    """A site API config nothing will dial — the HTTP client is built lazily."""
+    return SiteApiConfig(base_url="http://localhost/api/v1", token="tkg_test_token")
+
+
 def create_telegram_context() -> dict[type, object]:
     """The context ``goldy.telegram_bot`` hands its container."""
     return make_telegram_container_context(
         create_shared_configs(),
         TelegramConfig(bot_token=VALID_SHAPED_BOT_TOKEN),
         Bot(token=VALID_SHAPED_BOT_TOKEN),
+        create_site_api_config(),
     )
 
 
@@ -92,10 +98,7 @@ def create_worker_context() -> dict[type, object]:
         RabbitBroker(),
         WorkerConfigs(
             notification=NotificationConfig(bot_token=VALID_SHAPED_BOT_TOKEN),
-            site_api=SiteApiConfig(
-                base_url="http://localhost/api/v1",
-                token="tkg_test_token",
-            ),
+            site_api=create_site_api_config(),
         ),
     )
 

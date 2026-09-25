@@ -34,10 +34,13 @@ from goldy.presentation.telegram.handlers.profile import (
     PROFILE_DIALOG,
     router as profile_router,
 )
+from goldy.presentation.telegram.handlers.site import finance_router, link_router
 from goldy.presentation.telegram.handlers.start.handler import router as start_router
 
 FEATURE_ROUTERS: Final[Iterable[Router]] = (
+    link_router,
     start_router,
+    finance_router,
     help_router,
     profile_router,
     admin_router,
@@ -48,8 +51,10 @@ FEATURE_ROUTERS: Final[Iterable[Router]] = (
 )
 """The routers that claim an update because they recognise it.
 
-The order *within* this tuple does not matter — no two of these claim the same
-command — but the order of the tuple as a whole does, and it is the reason the
+The order *within* this tuple does not matter but in one place:
+``link_router`` sits above ``start_router``, because ``/start link_<code>`` is a
+``/start`` too and the generic greeting would swallow the site's linking code.
+The order of the tuple as a whole does, and it is the reason the
 storefront works at all. Three catalog windows carry a ``MessageInput`` that
 treats any typed text as a search term, and a dialog attached above these
 routers would swallow ``/cart`` as a search for the word "/cart". A command is

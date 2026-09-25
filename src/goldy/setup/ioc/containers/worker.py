@@ -10,6 +10,8 @@ from goldy.setup.ioc.providers import (
     notifications_provider,
     outbox_handlers_provider,
     site_api_provider,
+    site_order_handlers_provider,
+    site_sync_provider,
     task_manager_provider,
 )
 
@@ -26,7 +28,9 @@ def worker_providers() -> Iterable[Provider]:
     Bot API client and the token behind it, and only this process gets them:
     the bot answers the person who wrote to it, while the worker writes to
     people who did not. ``site_api_provider`` follows the same rule for the
-    site token: only the worker pulls the catalog from the site (ADR-0004).
+    site token; the worker pulls the catalog from the site and hands orders
+    over to it (ADR-0004), which is what ``site_sync_provider`` and
+    ``site_order_handlers_provider`` add.
     """
     return (
         *common_providers(),
@@ -35,6 +39,8 @@ def worker_providers() -> Iterable[Provider]:
         notifications_provider(),
         notification_handlers_provider(),
         site_api_provider(),
+        site_sync_provider(),
+        site_order_handlers_provider(),
         TaskiqProvider(),
     )
 

@@ -287,7 +287,12 @@ async def telegram_container(
     bot: RecordingBot,
 ) -> AsyncIterator[AsyncContainer]:
     container = make_telegram_container(
-        make_telegram_container_context(shared_configs, telegram_config, bot),
+        make_telegram_container_context(
+            shared_configs,
+            telegram_config,
+            bot,
+            SiteApiConfig(base_url="http://localhost/api/v1", token="tkg_integration"),
+        ),
     )
     yield container
     await container.close()

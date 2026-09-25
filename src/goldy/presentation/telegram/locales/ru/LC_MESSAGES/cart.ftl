@@ -16,6 +16,8 @@ cart-line = { $position }. { $name } — { $quantity } × { $price } = { $total 
 cart-line-unavailable-mark = ⚠ нет в каталоге
 cart-unavailable-notice = Отмеченные позиции пропали из каталога. Уберите их — тогда заказ можно будет оформить.
 cart-unpriced-notice = На позиции с пометкой «Цена по запросу» сейчас нет цены для вашего прайс-листа. Уберите их или напишите менеджеру — тогда заказ можно будет оформить.
+cart-personal-prices-notice = Цены ваши — посчитаны сайтом по условиям вашей компании.
+cart-personal-unavailable-notice = Сайт не ответил, поэтому показаны розничные цены. Оформить заказ можно, когда сайт снова посчитает ваши.
 cart-remove-unavailable-button = Убрать недоступные
 cart-checkout-button = Оформить заказ
 cart-clear-button = Очистить корзину

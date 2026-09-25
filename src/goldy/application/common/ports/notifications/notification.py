@@ -53,3 +53,15 @@ class OrderDeliveryAddressChangedNotification(Notification):
     number: str
     old_address: str
     new_address: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class OrderHandoverRejectedNotification(Notification):
+    """To staff: the site refused an order, so it is theirs to sort out by hand.
+
+    ``code`` is the site's stable reason; the renderer turns the known ones
+    into words and prints an unknown one as it is, rather than hiding it.
+    """
+
+    number: str
+    code: str

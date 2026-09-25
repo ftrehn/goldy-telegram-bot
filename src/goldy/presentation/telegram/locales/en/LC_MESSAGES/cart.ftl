@@ -14,6 +14,8 @@ cart-line = { $position }. { $name } — { $quantity } × { $price } = { $total 
 cart-line-unavailable-mark = ⚠ gone from the catalog
 cart-unavailable-notice = The marked lines have left the catalog. Remove them and the order can be placed.
 cart-unpriced-notice = The lines reading "price on request" have no price under your price list. Remove them or write to a manager, and the order can be placed.
+cart-personal-prices-notice = These are your prices — the site computed them under your company's terms.
+cart-personal-unavailable-notice = The site did not answer, so these are retail prices. You can place the order once the site computes yours again.
 cart-remove-unavailable-button = Remove unavailable
 cart-checkout-button = Place the order
 cart-clear-button = Empty the cart

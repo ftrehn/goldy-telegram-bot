@@ -31,6 +31,9 @@ from goldy.application.commands.catalog.finalize_catalog_import.handler import (
 from goldy.application.commands.catalog.import_catalog.handler import (
     ImportCatalogHandler,
 )
+from goldy.application.commands.notifications.notify_handover_rejected.handler import (
+    NotifyOrderHandoverRejectedHandler,
+)
 from goldy.application.commands.notifications.notify_order_address.handler import (
     NotifyDeliveryAddressChangedHandler,
 )
@@ -49,6 +52,21 @@ from goldy.application.commands.orders.change_order_status.handler import (
 )
 from goldy.application.commands.orders.place_order.handler import PlaceOrderHandler
 from goldy.application.commands.outbox.relay_outbox.handler import RelayOutboxHandler
+from goldy.application.commands.site.apply_site_order_status.handler import (
+    ApplySiteOrderStatusHandler,
+)
+from goldy.application.commands.site.hand_over_order.handler import (
+    HandOverOrderHandler,
+)
+from goldy.application.commands.site.link_site_account.handler import (
+    LinkSiteAccountHandler,
+)
+from goldy.application.commands.site.schedule_order_handover.handler import (
+    ScheduleOrderHandoverHandler,
+)
+from goldy.application.commands.site.unlink_site_account.handler import (
+    UnlinkSiteAccountHandler,
+)
 from goldy.application.commands.users.block_user.handler import BlockUserHandler
 from goldy.application.commands.users.change_notification_preferences.handler import (
     ChangeNotificationPreferencesHandler,
@@ -81,6 +99,13 @@ from goldy.application.queries.orders.get_last_delivery_address.handler import (
 from goldy.application.queries.orders.get_order.handler import GetOrderHandler
 from goldy.application.queries.orders.list_my_orders.handler import ListMyOrdersHandler
 from goldy.application.queries.orders.list_orders.handler import ListOrdersHandler
+from goldy.application.queries.site.get_site_finance_summary.handler import (
+    GetSiteFinanceSummaryHandler,
+)
+from goldy.application.queries.site.get_site_link.handler import GetSiteLinkHandler
+from goldy.application.queries.site.preview_site_link.handler import (
+    PreviewSiteLinkHandler,
+)
 from goldy.application.queries.users.get_current_user.handler import (
     GetCurrentUserHandler,
 )
@@ -214,5 +239,40 @@ def notification_handlers_provider() -> Provider:
         NotifyOrderPlacedHandler,
         NotifyOrderStatusChangedHandler,
         NotifyDeliveryAddressChangedHandler,
+        NotifyOrderHandoverRejectedHandler,
+    )
+    return provider
+
+
+def site_handlers_provider() -> Provider:
+    """What a person does with their site account: link, unlink, look.
+
+    Every handler here starts from the person asking — ``IdentityProvider``
+    or ``UserProvider`` — and asks the site through ``site_api_provider``, so
+    the group goes where both are: the bot.
+    """
+    provider: Final[Provider] = Provider(scope=Scope.REQUEST)
+    provider.provide_all(
+        PreviewSiteLinkHandler,
+        LinkSiteAccountHandler,
+        UnlinkSiteAccountHandler,
+        GetSiteLinkHandler,
+        GetSiteFinanceSummaryHandler,
+    )
+    return provider
+
+
+def site_order_handlers_provider() -> Provider:
+    """The order handover to the site, on nobody's behalf (ADR-0004).
+
+    The worker's: scheduling reacts to ``OrderPlaced``, handing over and
+    applying statuses run on the scheduler's tick. None of them has a person
+    to ask about, which is exactly why they must not sit with the shop group.
+    """
+    provider: Final[Provider] = Provider(scope=Scope.REQUEST)
+    provider.provide_all(
+        ScheduleOrderHandoverHandler,
+        HandOverOrderHandler,
+        ApplySiteOrderStatusHandler,
     )
     return provider

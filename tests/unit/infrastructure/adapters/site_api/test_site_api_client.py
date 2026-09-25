@@ -6,10 +6,15 @@ failures are worth retrying. The last one is what the tests are mostly about,
 together with the promise every adapter makes — no httpx exception leaves it.
 """
 
+import json
+
 import httpx
 import pytest
 
-from goldy.infrastructure.adapters.site_api.site_api_client import REQUEST_ID_HEADER
+from goldy.infrastructure.adapters.site_api.site_api_client import (
+    CUSTOMER_HEADER,
+    REQUEST_ID_HEADER,
+)
 from goldy.infrastructure.errors import (
     InfrastructureError,
     SiteApiError,
@@ -38,6 +43,37 @@ async def test_a_path_is_appended_to_the_api_root() -> None:
     await make_site_api_client(transport).get("catalog/sections")
 
     assert str(transport.requests[0].url) == "https://tkgoldy.ru/api/v1/catalog/sections"
+
+
+async def test_a_post_sends_the_body_as_json() -> None:
+    transport = ScriptedTransport(envelope({"ok": True}))
+
+    await make_site_api_client(transport).post("orders", {"external_id": "o-1"})
+
+    request = transport.requests[0]
+    assert request.method == "POST"
+    assert json.loads(request.content) == {"external_id": "o-1"}
+
+
+async def test_a_delete_carries_no_body() -> None:
+    transport = ScriptedTransport(httpx.Response(204))
+
+    await make_site_api_client(transport).delete("links/subject-1")
+
+    request = transport.requests[0]
+    assert request.method == "DELETE"
+    assert request.content == b""
+
+
+async def test_the_customer_header_is_added_only_when_a_subject_is_given() -> None:
+    transport = ScriptedTransport(envelope([]), envelope([]))
+    client = make_site_api_client(transport)
+
+    await client.get("me", customer="user-1")
+    await client.get("catalog/sections")
+
+    assert transport.requests[0].headers[CUSTOMER_HEADER] == "user-1"
+    assert CUSTOMER_HEADER not in transport.requests[1].headers
 
 
 async def test_the_envelope_is_unwrapped_and_the_site_request_id_kept() -> None:
@@ -101,6 +137,32 @@ async def test_a_refusal_is_not_worth_retrying_and_keeps_the_site_code(
 
     assert failure.value.status == status
     assert failure.value.code == "unauthorized"
+
+
+async def test_a_refusal_carries_the_envelopes_error_details() -> None:
+    answer = httpx.Response(
+        422,
+        json={
+            "error": {
+                "code": "prices_changed",
+                "details": {"changed": ["p-1", "p-2"]},
+            },
+        },
+    )
+
+    with pytest.raises(SiteApiRejectedError) as failure:
+        await make_site_api_client(ScriptedTransport(answer)).get("x")
+
+    assert failure.value.details == {"changed": ["p-1", "p-2"]}
+
+
+async def test_a_refusal_without_details_carries_an_empty_mapping() -> None:
+    answer = httpx.Response(422, json={"error": {"code": "prices_changed"}})
+
+    with pytest.raises(SiteApiRejectedError) as failure:
+        await make_site_api_client(ScriptedTransport(answer)).get("x")
+
+    assert failure.value.details == {}
 
 
 async def test_too_many_requests_is_worth_retrying_after_the_site_says() -> None:

@@ -39,6 +39,7 @@ order-lines-truncated = … и ещё позиций в заказе: { $count }
 order-cancelled-by =
     Заказ отменён { $by ->
         [manager] магазином
+        [shop] магазином на сайте
        *[customer] вами
     }
 order-cancellation-reason = Причина: { $reason }

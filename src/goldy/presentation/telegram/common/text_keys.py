@@ -64,6 +64,7 @@ COMMAND_CART: Final[str] = "command-cart"
 COMMAND_ORDERS: Final[str] = "command-orders"
 COMMAND_ME: Final[str] = "command-me"
 COMMAND_HELP: Final[str] = "command-help"
+COMMAND_FINANCE: Final[str] = "command-finance"
 """Descriptions for the published command menu, one per customer command.
 
 Separate keys rather than the lines of ``help-customer`` cut up, because the
@@ -241,6 +242,16 @@ CART_LINE: Final[str] = "cart-line"
 CART_LINE_UNAVAILABLE_MARK: Final[str] = "cart-line-unavailable-mark"
 CART_UNAVAILABLE_NOTICE: Final[str] = "cart-unavailable-notice"
 CART_UNPRICED_NOTICE: Final[str] = "cart-unpriced-notice"
+CART_PERSONAL_PRICES_NOTICE: Final[str] = "cart-personal-prices-notice"
+CART_PERSONAL_UNAVAILABLE_NOTICE: Final[str] = "cart-personal-unavailable-notice"
+"""Which prices the cart is drawn in, for a person linked to the site.
+
+A linked wholesale customer sees the price the site computes for them —
+company discount and contract prices included — and the screen says so, or the
+number beside the catalog's retail one reads as a mistake. When the site is
+down the cart falls back to retail and checkout is hidden: an order placed at
+a price the site did not confirm would be refused on handover anyway.
+"""
 """The other reason "checkout" is hidden, and not the same reason at all.
 
 ``cart-unavailable-notice`` says the marked products are gone from the catalog,
@@ -418,3 +429,52 @@ MANAGE_ORDERS_STATUS_BUTTON: Final[str] = "manage-orders-status-button"
 MANAGE_ORDERS_STATUS_PROMPT: Final[str] = "manage-orders-status-prompt"
 MANAGE_ORDERS_REASON_PROMPT: Final[str] = "manage-orders-reason-prompt"
 MANAGE_ORDERS_STATUS_CHANGED_TOAST: Final[str] = "manage-orders-status-changed-toast"
+
+# The link to the site account (ADR-0004). The refusals are reached through
+# ``ERROR_TEXTS`` and carry no placeholder, for the reason given above.
+SITE_UNAVAILABLE: Final[str] = "site-unavailable"
+SITE_NOT_LINKED: Final[str] = "site-not-linked"
+SITE_LINK_CODE_INVALID: Final[str] = "site-link-code-invalid"
+SITE_LINK_FORBIDDEN: Final[str] = "site-link-forbidden"
+SITE_CUSTOMER_NOT_LINKED: Final[str] = "site-customer-not-linked"
+SITE_FINANCE_DENIED: Final[str] = "site-finance-denied"
+SITE_ORDER_REJECTED: Final[str] = "site-order-rejected"
+SITE_ORDER_NOT_CANCELLABLE: Final[str] = "site-order-not-cancellable"
+
+SITE_LINK_PREVIEW: Final[str] = "site-link-preview"
+"""Needs ``who``: the masked name, e-mail and company, joined by the handler.
+
+The masked identity the site hands back for a code, and the question "is
+this you?". The step is the defence against somebody sending a victim a link
+with the attacker's own code, so the message has to make the answer obvious.
+"""
+SITE_LINK_CONFIRM_BUTTON: Final[str] = "site-link-confirm-button"
+SITE_LINK_CANCEL_BUTTON: Final[str] = "site-link-cancel-button"
+SITE_LINK_DONE: Final[str] = "site-link-done"
+"""Needs ``who``."""
+SITE_LINK_CANCELLED: Final[str] = "site-link-cancelled"
+SITE_LINK_AFTER_REGISTRATION: Final[str] = "site-link-after-registration"
+
+PROFILE_SITE_LINKED: Final[str] = "profile-site-linked"
+"""Needs ``who``: the line under the profile when the site is linked."""
+PROFILE_SITE_NOT_LINKED: Final[str] = "profile-site-not-linked"
+PROFILE_SITE_UNLINK_BUTTON: Final[str] = "profile-site-unlink-button"
+PROFILE_SITE_UNLINK_PROMPT: Final[str] = "profile-site-unlink-prompt"
+PROFILE_SITE_UNLINKED_TOAST: Final[str] = "profile-site-unlinked-toast"
+
+FINANCE_TITLE: Final[str] = "finance-title"
+"""Needs ``company``."""
+FINANCE_NO_ERP: Final[str] = "finance-no-erp"
+FINANCE_DEBT: Final[str] = "finance-debt"
+"""Needs ``amount``. Each figure is its own message, drawn only when known:
+``None`` means *unknown*, and a zero printed in its place would be a claim."""
+FINANCE_ADVANCE: Final[str] = "finance-advance"
+FINANCE_OVERDUE: Final[str] = "finance-overdue"
+"""Needs ``amount days``."""
+FINANCE_CREDIT_LIMIT: Final[str] = "finance-credit-limit"
+"""Needs ``limit available``."""
+FINANCE_CREDIT_UNTRACKED: Final[str] = "finance-credit-untracked"
+FINANCE_STALE: Final[str] = "finance-stale"
+"""Needs ``as_of``: 1C was silent and these are its last known figures."""
+FINANCE_PARTIAL: Final[str] = "finance-partial"
+FINANCE_FOOTER: Final[str] = "finance-footer"

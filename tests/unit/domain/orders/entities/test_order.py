@@ -175,6 +175,7 @@ def test_order_events_carry_primitives_and_not_value_objects() -> None:
     (
         (OrderStatus.NEW, Order.confirm, OrderStatus.CONFIRMED),
         (OrderStatus.CONFIRMED, Order.ship, OrderStatus.SHIPPED),
+        (OrderStatus.CONFIRMED, Order.complete, OrderStatus.COMPLETED),
         (OrderStatus.SHIPPED, Order.complete, OrderStatus.COMPLETED),
     ),
 )
@@ -208,7 +209,6 @@ def test_every_step_the_table_allows_is_taken_and_announced(
         (OrderStatus.NEW, Order.ship),
         (OrderStatus.NEW, Order.complete),
         (OrderStatus.CONFIRMED, Order.confirm),
-        (OrderStatus.CONFIRMED, Order.complete),
         (OrderStatus.SHIPPED, Order.confirm),
         (OrderStatus.SHIPPED, Order.ship),
         (OrderStatus.COMPLETED, Order.confirm),
@@ -231,13 +231,13 @@ def test_every_step_the_table_forbids_is_refused(
 
 
 def test_a_refused_step_leaves_the_status_where_it_was() -> None:
-    order, collection = make_order(status=OrderStatus.CONFIRMED)
+    order, collection = make_order(status=OrderStatus.NEW)
     drain(collection)
 
     with pytest.raises(OrderStatusTransitionError):
         order.complete()
 
-    assert order.status is OrderStatus.CONFIRMED
+    assert order.status is OrderStatus.NEW
     assert emitted_event_names(collection) == []
 
 
@@ -317,6 +317,42 @@ def test_a_finished_order_cannot_be_cancelled_even_by_a_manager(
             cancelled_by_user_id=MANAGER_ID,
             reason=reason,
         )
+
+
+@pytest.mark.parametrize(
+    "status",
+    (OrderStatus.NEW, OrderStatus.CONFIRMED, OrderStatus.SHIPPED),
+)
+def test_the_shop_cancels_through_the_site_without_a_reason_or_a_person(
+    status: OrderStatus,
+) -> None:
+    """The site's order feed carries neither a reason nor a person of ours.
+
+    Unlike a manager, the shop is not held to ``CancellationReasonRequiredError``
+    — there is nobody here to have said why, and unlike a customer it is not
+    held to ``CUSTOMER_CANCELLABLE_STATUSES`` — a dispatched order can still be
+    stopped from the site's side.
+    """
+    order, collection = make_order(status=status)
+    drain(collection)
+
+    order.cancel(initiated_by=CancellationInitiator.SHOP, cancelled_by_user_id=None)
+
+    assert order.status is OrderStatus.CANCELLED
+    assert order.cancelled_by is CancellationInitiator.SHOP
+    assert order.cancelled_by_user_id is None
+    assert order.cancellation_reason is None
+    assert emitted_event_names(collection) == ["OrderStatusChanged"]
+
+
+@pytest.mark.parametrize("status", (OrderStatus.COMPLETED, OrderStatus.CANCELLED))
+def test_the_shop_cannot_cancel_an_order_that_is_already_finished(
+    status: OrderStatus,
+) -> None:
+    order, _ = make_order(status=status)
+
+    with pytest.raises(OrderStatusTransitionError):
+        order.cancel(initiated_by=CancellationInitiator.SHOP, cancelled_by_user_id=None)
 
 
 def test_a_manager_has_to_say_why() -> None:

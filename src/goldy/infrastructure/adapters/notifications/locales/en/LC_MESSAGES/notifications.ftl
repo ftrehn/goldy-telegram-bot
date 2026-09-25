@@ -44,3 +44,16 @@ notification-order-address-changed =
 
     Was: { $old_address }
     Now: { $new_address }
+
+notification-order-handover-rejected =
+    Order { $number } was not handed over to the site: { $code ->
+        [prices_changed] prices changed since checkout
+        [item_unavailable] a position is not on sale on the site
+        [quantity_not_multiple] a quantity is not a multiple of the pack
+        [credit_limit_exceeded] the company's credit limit is used up
+        [customer_not_linked] the customer unlinked their site account
+        [external_id_reused] the site already has an order under this number
+        [rate_limited] the site is limiting orders
+       *[other] the site answered "{ $code }"
+    }.
+    The order stays in the bot — enter it on the site or in 1C by hand.

@@ -13,6 +13,8 @@ from goldy.setup.ioc.providers import (
     pipelines_provider,
     services_provider,
     shop_handlers_provider,
+    site_api_provider,
+    site_handlers_provider,
     user_handlers_provider,
 )
 
@@ -51,9 +53,15 @@ def interactive_providers() -> Iterable[Provider]:
     both need the same thing, and neither may move into the core. A catalog
     query looks harmless enough to put there and is not: it resolves the price
     list of whoever is asking, so it cannot answer at all without a person.
+
+    ``site_api_provider`` rides along because a person's request is what asks
+    the site for their prices, their link and their company's money (ADR-0004)
+    — and a customer's cancellation of an order the site already has.
     """
     return (
         services_provider(),
         user_handlers_provider(),
         shop_handlers_provider(),
+        site_handlers_provider(),
+        site_api_provider(),
     )

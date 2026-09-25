@@ -7,11 +7,24 @@ from dishka import Provider, Scope
 from goldy.application.commands.catalog.catalog_synchronizer import (
     CatalogSynchronizer,
 )
+from goldy.application.commands.site.order_handover_runner import OrderHandoverRunner
 from goldy.application.common.ports.catalog import CatalogSource
+from goldy.application.common.ports.site import (
+    SiteFinance,
+    SiteLinking,
+    SiteOrders,
+    SitePricing,
+)
 from goldy.infrastructure.adapters.catalog.site_catalog_source import (
     SiteCatalogSource,
 )
 from goldy.infrastructure.adapters.site_api.site_api_client import SiteApiClient
+from goldy.infrastructure.adapters.site_api.site_customer_adapters import (
+    HttpSiteFinance,
+    HttpSiteLinking,
+    HttpSitePricing,
+)
+from goldy.infrastructure.adapters.site_api.site_orders_adapter import HttpSiteOrders
 from goldy.setup.configs.site_api_config import SiteApiConfig
 
 
@@ -58,26 +71,38 @@ def make_site_catalog_source(
 
 
 def site_api_provider() -> Provider:
-    """The site tkgoldy.ru — the only bridge to 1C — and only the worker gets it.
+    """The site tkgoldy.ru — the only bridge to 1C — for the processes that talk to it.
 
     Its own group for the rule ``notifications_provider`` follows: it carries a
     secret, the site token, and a container is a statement about what a
-    process may do. The bot has no business pulling a catalog or holding the
-    key to the site's API; the seeder reads a file and binds ``CatalogSource``
-    to it through ``catalog_source_provider`` instead.
+    process may do. The bot gets it because linking, personal prices, finance
+    and a customer's cancellation all ask the site on a person's behalf; the
+    worker gets it to hand orders over and read their statuses back. The
+    seeder does not: it reads a file and talks to nobody.
 
-    ``APP`` for what belongs to the process — the connection pool, the client
-    that holds nothing but it and the token, and the stateless source.
-    ``REQUEST`` for the synchronizer, which sends commands through the
-    request's ``Sender`` and so lives as long as one task run.
+    Everything here is ``APP``-scoped: the connection pool, the client that
+    holds nothing but it and the token, and four stateless adapters over it.
+    """
+    provider: Final[Provider] = Provider(scope=Scope.APP)
+    provider.from_context(provides=SiteApiConfig, scope=Scope.APP)
+    provider.provide(make_site_api_http_client)
+    provider.provide(make_site_api_client)
+    provider.provide(source=HttpSiteLinking, provides=SiteLinking)
+    provider.provide(source=HttpSitePricing, provides=SitePricing)
+    provider.provide(source=HttpSiteFinance, provides=SiteFinance)
+    provider.provide(source=HttpSiteOrders, provides=SiteOrders)
+    return provider
 
-    The client is bound on its own so the order outbox and linking, when they
-    arrive, reuse this pool rather than open a second one.
+
+def site_sync_provider() -> Provider:
+    """What the worker runs against the site on a schedule.
+
+    The catalog pull and the order handover. ``REQUEST`` for the two runners,
+    which send commands through the request's ``Sender`` and so live as long
+    as one task run; ``APP`` for the stateless catalog source.
     """
     provider: Final[Provider] = Provider(scope=Scope.REQUEST)
-    provider.from_context(provides=SiteApiConfig, scope=Scope.APP)
-    provider.provide(make_site_api_http_client, scope=Scope.APP)
-    provider.provide(make_site_api_client, scope=Scope.APP)
     provider.provide(make_site_catalog_source, scope=Scope.APP)
     provider.provide(source=CatalogSynchronizer)
+    provider.provide(source=OrderHandoverRunner)
     return provider

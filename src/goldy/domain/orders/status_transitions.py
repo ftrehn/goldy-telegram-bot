@@ -5,7 +5,9 @@ from goldy.domain.orders.values.order_status import OrderStatus
 
 ALLOWED_ORDER_TRANSITIONS: Final[Mapping[OrderStatus, frozenset[OrderStatus]]] = {
     OrderStatus.NEW: frozenset({OrderStatus.CONFIRMED, OrderStatus.CANCELLED}),
-    OrderStatus.CONFIRMED: frozenset({OrderStatus.SHIPPED, OrderStatus.CANCELLED}),
+    OrderStatus.CONFIRMED: frozenset(
+        {OrderStatus.SHIPPED, OrderStatus.COMPLETED, OrderStatus.CANCELLED},
+    ),
     OrderStatus.SHIPPED: frozenset({OrderStatus.COMPLETED, OrderStatus.CANCELLED}),
     OrderStatus.COMPLETED: frozenset(),
     OrderStatus.CANCELLED: frozenset(),
@@ -23,6 +25,11 @@ so there is no separate "cannot leave a finished order" check anywhere.
 Cancelling a ``SHIPPED`` order is allowed on purpose: a courier does come back
 with the parcel, and a lifecycle that cannot express it forces staff to record
 the truth somewhere the system cannot see.
+
+``CONFIRMED`` may go straight to ``COMPLETED``. The site the order is handed
+over to (ADR-0004) has no "shipped" stage — a manager marks the order done —
+and an order collected from the warehouse never ships at all; walking it
+through ``SHIPPED`` would tell the customer their parcel left when it did not.
 """
 
 CUSTOMER_CANCELLABLE_STATUSES: Final[frozenset[OrderStatus]] = frozenset(

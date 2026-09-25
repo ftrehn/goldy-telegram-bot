@@ -205,7 +205,7 @@ class Order(Aggregate[OrderId]):
         self,
         *,
         initiated_by: CancellationInitiator,
-        cancelled_by_user_id: UserId,
+        cancelled_by_user_id: UserId | None,
         reason: CancellationReason | None = None,
     ) -> None:
         """Stops the order, recording which side stopped it, who exactly, and why.
@@ -220,7 +220,9 @@ class Order(Aggregate[OrderId]):
 
         ``cancelled_by_user_id`` is the person behind the initiator. For a
         customer it repeats ``customer_id``; for staff it is the one fact the
-        initiator alone cannot give — which of the managers did it.
+        initiator alone cannot give — which of the managers did it. For the
+        shop, cancelling through the site, there is no person of ours to name
+        and no reason in the feed, so neither is required.
 
         Raises:
             CustomerCannotCancelProcessedOrderError: the customer is trying to

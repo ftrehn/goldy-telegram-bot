@@ -42,6 +42,12 @@ from goldy.application.commands.catalog.import_catalog.command import (
 from goldy.application.commands.catalog.import_catalog.handler import (
     ImportCatalogHandler,
 )
+from goldy.application.commands.notifications.notify_handover_rejected.command import (
+    NotifyOrderHandoverRejectedCommand,
+)
+from goldy.application.commands.notifications.notify_handover_rejected.handler import (
+    NotifyOrderHandoverRejectedHandler,
+)
 from goldy.application.commands.notifications.notify_order_address.command import (
     NotifyDeliveryAddressChangedCommand,
 )
@@ -78,6 +84,36 @@ from goldy.application.commands.orders.place_order.command import PlaceOrderComm
 from goldy.application.commands.orders.place_order.handler import PlaceOrderHandler
 from goldy.application.commands.outbox.relay_outbox.command import RelayOutboxCommand
 from goldy.application.commands.outbox.relay_outbox.handler import RelayOutboxHandler
+from goldy.application.commands.site.apply_site_order_status.command import (
+    ApplySiteOrderStatusCommand,
+)
+from goldy.application.commands.site.apply_site_order_status.handler import (
+    ApplySiteOrderStatusHandler,
+)
+from goldy.application.commands.site.hand_over_order.command import (
+    HandOverOrderCommand,
+)
+from goldy.application.commands.site.hand_over_order.handler import (
+    HandOverOrderHandler,
+)
+from goldy.application.commands.site.link_site_account.command import (
+    LinkSiteAccountCommand,
+)
+from goldy.application.commands.site.link_site_account.handler import (
+    LinkSiteAccountHandler,
+)
+from goldy.application.commands.site.schedule_order_handover.command import (
+    ScheduleOrderHandoverCommand,
+)
+from goldy.application.commands.site.schedule_order_handover.handler import (
+    ScheduleOrderHandoverHandler,
+)
+from goldy.application.commands.site.unlink_site_account.command import (
+    UnlinkSiteAccountCommand,
+)
+from goldy.application.commands.site.unlink_site_account.handler import (
+    UnlinkSiteAccountHandler,
+)
 from goldy.application.commands.users.block_user.command import BlockUserCommand
 from goldy.application.commands.users.block_user.handler import BlockUserHandler
 from goldy.application.commands.users.change_notification_preferences.command import (
@@ -142,6 +178,18 @@ from goldy.application.queries.orders.list_my_orders.handler import ListMyOrders
 from goldy.application.queries.orders.list_my_orders.query import ListMyOrdersQuery
 from goldy.application.queries.orders.list_orders.handler import ListOrdersHandler
 from goldy.application.queries.orders.list_orders.query import ListOrdersQuery
+from goldy.application.queries.site.get_site_finance_summary.handler import (
+    GetSiteFinanceSummaryHandler,
+)
+from goldy.application.queries.site.get_site_finance_summary.query import (
+    GetSiteFinanceSummaryQuery,
+)
+from goldy.application.queries.site.get_site_link.handler import GetSiteLinkHandler
+from goldy.application.queries.site.get_site_link.query import GetSiteLinkQuery
+from goldy.application.queries.site.preview_site_link.handler import (
+    PreviewSiteLinkHandler,
+)
+from goldy.application.queries.site.preview_site_link.query import PreviewSiteLinkQuery
 from goldy.application.queries.users.get_current_user.handler import (
     GetCurrentUserHandler,
 )
@@ -226,6 +274,28 @@ def make_registry() -> Registry:
     registry.add_request_handler(
         ChangeDeliveryAddressCommand,
         ChangeDeliveryAddressHandler,
+    )
+
+    registry.add_request_handler(
+        NotifyOrderHandoverRejectedCommand,
+        NotifyOrderHandoverRejectedHandler,
+    )
+    registry.add_request_handler(LinkSiteAccountCommand, LinkSiteAccountHandler)
+    registry.add_request_handler(UnlinkSiteAccountCommand, UnlinkSiteAccountHandler)
+    registry.add_request_handler(
+        ScheduleOrderHandoverCommand,
+        ScheduleOrderHandoverHandler,
+    )
+    registry.add_request_handler(HandOverOrderCommand, HandOverOrderHandler)
+    registry.add_request_handler(
+        ApplySiteOrderStatusCommand,
+        ApplySiteOrderStatusHandler,
+    )
+    registry.add_request_handler(PreviewSiteLinkQuery, PreviewSiteLinkHandler)
+    registry.add_request_handler(GetSiteLinkQuery, GetSiteLinkHandler)
+    registry.add_request_handler(
+        GetSiteFinanceSummaryQuery,
+        GetSiteFinanceSummaryHandler,
     )
 
     registry.add_request_handler(GetCurrentUserQuery, GetCurrentUserHandler)

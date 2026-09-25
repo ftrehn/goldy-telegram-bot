@@ -101,7 +101,7 @@ async def on_order_placed(
 ) -> None:
     outcome = await sender.send(
         NotifyOrderPlacedCommand(
-            message_id=_message_id(message, event),
+            message_id=message_id_of(message, event),
             event_type=message.raw_message.routing_key or event.event_type,
             order_id=event.order_id,
         ),
@@ -125,7 +125,7 @@ async def on_order_status_changed(
 ) -> None:
     outcome = await sender.send(
         NotifyOrderStatusChangedCommand(
-            message_id=_message_id(message, event),
+            message_id=message_id_of(message, event),
             event_type=message.raw_message.routing_key or event.event_type,
             order_number=event.order_number,
             customer_id=event.customer_id,
@@ -152,7 +152,7 @@ async def on_order_address_changed(
 ) -> None:
     outcome = await sender.send(
         NotifyDeliveryAddressChangedCommand(
-            message_id=_message_id(message, event),
+            message_id=message_id_of(message, event),
             event_type=message.raw_message.routing_key or event.event_type,
             order_number=event.order_number,
             customer_id=event.customer_id,
@@ -163,7 +163,7 @@ async def on_order_address_changed(
     logger.debug("notifications: order address changed -> %s", outcome)
 
 
-def _message_id(message: RabbitMessage, event: Event) -> UUID:
+def message_id_of(message: RabbitMessage, event: Event) -> UUID:
     """The outbox row id this delivery is a copy of.
 
     Read from the AMQP ``message_id`` the publisher sets, which survives every

@@ -4,6 +4,7 @@ from typing import Final
 from aiogram import F, Router
 from aiogram.enums import ChatType
 from aiogram.filters import CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Contact, Message
 from aiogram_i18n import I18nContext
 from dishka import FromDishka
@@ -22,6 +23,10 @@ from goldy.presentation.telegram.errors import (
     ContactHasNoPhoneNumberError,
 )
 from goldy.presentation.telegram.filters.chat import ChatTypeFilter
+from goldy.presentation.telegram.handlers.site.link import (
+    send_link_preview,
+    take_pending_code,
+)
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -61,9 +66,13 @@ async def handle_shared_contact(
     message: Message,
     contact: Contact,
     sender: FromDishka[Sender],
+    state: FSMContext,
     i18n: I18nContext,
 ) -> None:
     """Registers whoever just shared their own contact.
+
+    A person who arrived through a site linking link gets its preview right
+    after the greeting: the code waited in FSM data while they registered.
 
     ``F.contact.as_("contact")`` rather than a bare ``F.contact``: the filter
     only decides *whether* to run without it, and aiogram then calls this with
@@ -111,3 +120,9 @@ async def handle_shared_contact(
         i18n.get(text_keys.START_WELCOME, name=view.first_name),
         reply_markup=remove_keyboard(),
     )
+
+    code = await take_pending_code(state)
+
+    if code is not None:
+        await message.answer(i18n.get(text_keys.SITE_LINK_AFTER_REGISTRATION))
+        await send_link_preview(message, code, sender, i18n)

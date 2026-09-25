@@ -35,3 +35,6 @@ explanation the person is owed."""
 NOTIFICATION_ORDER_ADDRESS_CHANGED: Final[str] = "notification-order-address-changed"
 """To the customer: the order is going somewhere else. Args: number,
 old_address, new_address."""
+
+NOTIFICATION_ORDER_HANDOVER_REJECTED: Final[str] = "notification-order-handover-rejected"
+"""To staff: the site refused an order handed over to it. Args: number, code."""

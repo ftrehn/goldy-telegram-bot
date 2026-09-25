@@ -11,6 +11,7 @@ from taskiq_redis import ListRedisScheduleSource, RedisAsyncResultBackend
 from goldy.infrastructure.task_manager.tasks import (
     setup_catalog_tasks,
     setup_outbox_tasks,
+    setup_site_order_tasks,
 )
 from goldy.setup.configs.rabbitmq_config import RabbitMQConfig
 from goldy.setup.configs.redis_config import RedisConfig
@@ -118,6 +119,7 @@ def setup_task_manager_tasks(broker: AsyncBroker, catalog_sync_cron: str) -> Non
     """
     setup_outbox_tasks(broker)
     setup_catalog_tasks(broker, catalog_sync_cron)
+    setup_site_order_tasks(broker)
 
 
 def setup_scheduler(

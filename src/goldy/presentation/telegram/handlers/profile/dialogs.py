@@ -1,6 +1,7 @@
 import operator
 from typing import Final
 
+from aiogram import F
 from aiogram.enums import ContentType
 from aiogram_dialog import Dialog, Window
 from aiogram_dialog.widgets.input import MessageInput
@@ -16,11 +17,13 @@ from goldy.presentation.telegram.handlers.profile.callbacks import (
     on_marketing_toggled,
     on_notify_via_selected,
     on_rename,
+    on_site_unlinked,
 )
 from goldy.presentation.telegram.handlers.profile.getters import (
     accounts_getter,
     locales_getter,
     profile_getter,
+    site_link_getter,
 )
 from goldy.presentation.telegram.handlers.profile.states import ProfileStates
 
@@ -34,6 +37,12 @@ PROFILE_DIALOG: Final[Dialog] = Dialog(
             locale=Format("{locale}"),
             notify=Format("{notify}"),
         ),
+        I18NFormat(
+            text_keys.PROFILE_SITE_LINKED,
+            who=Format("{site_who}"),
+            when="site_linked",
+        ),
+        I18NFormat(text_keys.PROFILE_SITE_NOT_LINKED, when=~F["site_linked"]),
         SwitchTo(
             I18NFormat(text_keys.PROFILE_RENAME_BUTTON),
             id="rename",
@@ -55,9 +64,15 @@ PROFILE_DIALOG: Final[Dialog] = Dialog(
             state=ProfileStates.ACCOUNTS,
             when="can_unlink",
         ),
+        SwitchTo(
+            I18NFormat(text_keys.PROFILE_SITE_UNLINK_BUTTON),
+            id="site_unlink",
+            state=ProfileStates.SITE_UNLINK,
+            when="site_linked",
+        ),
         Button(I18NFormat(text_keys.PROFILE_CLOSE_BUTTON), id="close", on_click=on_close),
         state=ProfileStates.MAIN,
-        getter=profile_getter,
+        getter=[profile_getter, site_link_getter],
     ),
     Window(
         I18NFormat(text_keys.PROFILE_RENAME_PROMPT),
@@ -133,5 +148,19 @@ PROFILE_DIALOG: Final[Dialog] = Dialog(
         ),
         state=ProfileStates.ACCOUNTS,
         getter=accounts_getter,
+    ),
+    Window(
+        I18NFormat(text_keys.PROFILE_SITE_UNLINK_PROMPT),
+        Button(
+            I18NFormat(text_keys.COMMON_CONFIRM_BUTTON),
+            id="site_unlink_confirm",
+            on_click=on_site_unlinked,
+        ),
+        SwitchTo(
+            I18NFormat(text_keys.PROFILE_BACK_BUTTON),
+            id="back",
+            state=ProfileStates.MAIN,
+        ),
+        state=ProfileStates.SITE_UNLINK,
     ),
 )

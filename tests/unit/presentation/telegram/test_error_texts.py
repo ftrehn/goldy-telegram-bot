@@ -19,6 +19,7 @@ from goldy.application.error import (
     NotificationChannelUnavailableError,
     NotificationUndeliverableError,
     PaginationError,
+    SiteSubjectTakenError,
 )
 from goldy.domain.carts import errors as cart_errors
 from goldy.domain.catalog import errors as catalog_errors
@@ -50,6 +51,7 @@ ANSWERED_ELSEWHERE: Final[frozenset[type[AppError]]] = frozenset(
         CartAlreadyExistsError,
         NotificationUndeliverableError,
         NotificationChannelUnavailableError,
+        SiteSubjectTakenError,
     },
 )
 """The classes that deliberately have no message of their own.
@@ -63,6 +65,8 @@ CLI, which has no chat to answer in and no i18n to answer with.
 ``CartAlreadyExistsError`` never leaves ``CartProvider``, which answers it by
 taking the cart that won the race. The two notification errors are raised in
 the worker, where nobody is in a chat to read a message.
+``SiteSubjectTakenError`` never leaves the linking handler, which answers it by
+removing the old link and linking again.
 """
 
 

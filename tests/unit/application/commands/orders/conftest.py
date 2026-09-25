@@ -21,6 +21,7 @@ from goldy.application.commands.orders.change_order_status.handler import (
 from goldy.application.commands.orders.place_order.handler import PlaceOrderHandler
 from goldy.application.common.services.cart_pricing_service import CartPricingService
 from goldy.application.common.services.cart_provider import CartProvider
+from goldy.application.common.services.personal_pricing import PersonalPricingService
 from goldy.application.common.services.price_type_resolver import PriceTypeResolver
 from goldy.application.common.services.user_provider import UserProvider
 from goldy.domain.carts.entities.cart import Cart
@@ -44,6 +45,12 @@ from tests.unit.stubs.identity import StubIdentityProvider
 from tests.unit.stubs.orders import (
     InMemoryCartCommandGateway,
     InMemoryOrderCommandGateway,
+)
+from tests.unit.stubs.site import (
+    InMemoryOrderHandoverDao,
+    InMemorySiteLinkQueryGateway,
+    ScriptedSiteOrders,
+    ScriptedSitePricing,
 )
 
 type CartSeeder = Callable[[UserId, Mapping[int, int]], Cart]
@@ -84,8 +91,37 @@ def pricing_reader() -> StubPricingReader:
 
 
 @pytest.fixture()
-def cart_pricing_service(pricing_reader: StubPricingReader) -> CartPricingService:
-    return CartPricingService(PriceTypeResolver(pricing_reader), pricing_reader)
+def site_links() -> InMemorySiteLinkQueryGateway:
+    """Nobody is linked to the site unless a test links them."""
+    return InMemorySiteLinkQueryGateway()
+
+
+@pytest.fixture()
+def site_pricing() -> ScriptedSitePricing:
+    return ScriptedSitePricing()
+
+
+@pytest.fixture()
+def cart_pricing_service(
+    pricing_reader: StubPricingReader,
+    site_links: InMemorySiteLinkQueryGateway,
+    site_pricing: ScriptedSitePricing,
+) -> CartPricingService:
+    return CartPricingService(
+        PriceTypeResolver(pricing_reader),
+        pricing_reader,
+        PersonalPricingService(site_links, site_pricing),
+    )
+
+
+@pytest.fixture()
+def handover_dao() -> InMemoryOrderHandoverDao:
+    return InMemoryOrderHandoverDao()
+
+
+@pytest.fixture()
+def site_orders() -> ScriptedSiteOrders:
+    return ScriptedSiteOrders()
 
 
 @pytest.fixture()
@@ -113,8 +149,16 @@ def cancel_order_handler(
     user_provider: UserProvider,
     access_service: AccessService,
     order_gateway: InMemoryOrderCommandGateway,
+    handover_dao: InMemoryOrderHandoverDao,
+    site_orders: ScriptedSiteOrders,
 ) -> CancelOrderHandler:
-    return CancelOrderHandler(user_provider, access_service, order_gateway)
+    return CancelOrderHandler(
+        user_provider,
+        access_service,
+        order_gateway,
+        handover_dao,
+        site_orders,
+    )
 
 
 @pytest.fixture()

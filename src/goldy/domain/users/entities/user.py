@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Self, final
 
 from goldy.domain.common.aggregate import Aggregate
 from goldy.domain.users.entities.messenger_account import MessengerAccount
+from goldy.domain.users.entities.site_link import SiteLink
 from goldy.domain.users.errors import (
     LastMessengerAccountError,
     MessengerAccountNotLinkedError,
@@ -16,6 +17,8 @@ from goldy.domain.users.errors import (
 from goldy.domain.users.events import (
     MessengerAccountLinked,
     MessengerAccountUnlinked,
+    SiteAccountLinked,
+    SiteAccountUnlinked,
     UserBlocked,
     UserPhoneNumberChanged,
     UserPreferencesChanged,
@@ -76,6 +79,7 @@ class User(Aggregate[UserId]):
     status: UserStatus = field(default=UserStatus.ACTIVE)
     block_reason: BlockReason | None = field(default=None)
     accounts: list[MessengerAccount] = field(default_factory=list)
+    site_link: SiteLink | None = field(default=None)
 
     @classmethod
     def register(
@@ -190,6 +194,34 @@ class User(Aggregate[UserId]):
                 external_id=str(account.external_id),
             ),
         )
+
+    def link_site_account(self, link: SiteLink) -> None:
+        """Records that the site linked this person to one of its customers.
+
+        Replaces a previous link rather than refusing: the site allows one
+        customer per subject, and by the time this runs it has already said
+        yes, so the bot's copy follows the site's answer.
+        """
+        self.site_link = link
+        self._touch()
+        self._record(SiteAccountLinked(user_id=self.id))
+
+    def unlink_site_account(self) -> None:
+        """Forgets the link to the site's customer account.
+
+        Idempotent: a person unlinked already is the requested outcome, and
+        the site answers the same for a link it never had.
+        """
+        if self.site_link is None:
+            return
+
+        self.site_link = None
+        self._touch()
+        self._record(SiteAccountUnlinked(user_id=self.id))
+
+    @property
+    def is_site_linked(self) -> bool:
+        return self.site_link is not None
 
     def refresh_username(
         self,

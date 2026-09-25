@@ -13,6 +13,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import composite, relationship
 
 from goldy.domain.users.entities.messenger_account import MessengerAccount
+from goldy.domain.users.entities.site_link import (
+    MAX_SITE_COMPANY_NAME_LENGTH,
+    MAX_SITE_CUSTOMER_NAME_LENGTH,
+    SiteLink,
+)
 from goldy.domain.users.entities.user import User
 from goldy.domain.users.values.full_name import FullName
 from goldy.domain.users.values.user_preferences import UserPreferences
@@ -83,6 +88,30 @@ link would slip past the aggregate's check.
 """
 
 
+user_site_links_table: Final[Table] = Table(
+    "user_site_links",
+    mapper_registry.metadata,
+    Column(
+        "user_id",
+        SA_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("customer_name", String(MAX_SITE_CUSTOMER_NAME_LENGTH), nullable=False),
+    Column("company_name", String(MAX_SITE_COMPANY_NAME_LENGTH), nullable=True),
+    Column("is_wholesale", Boolean, nullable=False),
+    Column("linked_at", DateTime(timezone=True), nullable=False),
+)
+"""The bot's copy of a person's link to the site's customer account.
+
+Keyed by the user, because the site links one customer per subject and the
+subject is the ``UserId``. A row of its own rather than columns on ``users``:
+an absent link is an absent row, and nullable columns for a thing most people
+never have would put four ``NULL``s on every customer and a composite that
+cannot say "none".
+"""
+
+
 def map_users_table() -> None:
     """Maps the User aggregate and the accounts inside it.
 
@@ -103,6 +132,17 @@ def map_users_table() -> None:
             "external_id": messenger_accounts_table.c.external_id,
             "username": messenger_accounts_table.c.username,
             "linked_at": messenger_accounts_table.c.linked_at,
+        },
+    )
+
+    mapper_registry.map_imperatively(
+        SiteLink,
+        user_site_links_table,
+        properties={
+            "customer_name": user_site_links_table.c.customer_name,
+            "company_name": user_site_links_table.c.company_name,
+            "is_wholesale": user_site_links_table.c.is_wholesale,
+            "linked_at": user_site_links_table.c.linked_at,
         },
     )
 
@@ -133,6 +173,12 @@ def map_users_table() -> None:
                 lazy="selectin",
                 cascade="all, delete-orphan",
                 order_by=messenger_accounts_table.c.linked_at,
+            ),
+            "site_link": relationship(
+                SiteLink,
+                lazy="selectin",
+                uselist=False,
+                cascade="all, delete-orphan",
             ),
         },
     )

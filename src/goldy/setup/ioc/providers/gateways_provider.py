@@ -22,8 +22,10 @@ from goldy.application.common.ports.outbox import (
     EventSerializer,
     OutboxCommandGateway,
 )
+from goldy.application.common.ports.site import OrderHandoverDao
 from goldy.application.common.ports.transaction_manager import TransactionManager
 from goldy.application.common.ports.users import (
+    SiteLinkQueryGateway,
     UserCommandGateway,
     UserQueryGateway,
 )
@@ -51,6 +53,9 @@ from goldy.infrastructure.adapters.persistence.sqlalchemy_catalog_query_gateway 
 from goldy.infrastructure.adapters.persistence.sqlalchemy_order_command_gateway import (
     SqlAlchemyOrderCommandGateway,
 )
+from goldy.infrastructure.adapters.persistence.sqlalchemy_order_handover_dao import (
+    SqlAlchemyOrderHandoverDao,
+)
 from goldy.infrastructure.adapters.persistence.sqlalchemy_order_query_gateway import (
     SqlAlchemyOrderQueryGateway,
 )
@@ -59,6 +64,9 @@ from goldy.infrastructure.adapters.persistence.sqlalchemy_outbox_command_gateway
 )
 from goldy.infrastructure.adapters.persistence.sqlalchemy_pricing_reader import (
     SqlAlchemyPricingReader,
+)
+from goldy.infrastructure.adapters.persistence.sqlalchemy_site_link_query_gateway import (
+    SqlAlchemySiteLinkQueryGateway,
 )
 from goldy.infrastructure.adapters.persistence.sqlalchemy_transaction_manager import (
     SqlAlchemyTransactionManager,
@@ -140,6 +148,8 @@ def gateways_provider() -> Provider:
 
     provider.provide(source=SqlAlchemyOrderCommandGateway, provides=OrderCommandGateway)
     provider.provide(source=SqlAlchemyOrderQueryGateway, provides=OrderQueryGateway)
+    provider.provide(source=SqlAlchemySiteLinkQueryGateway, provides=SiteLinkQueryGateway)
+    provider.provide(source=SqlAlchemyOrderHandoverDao, provides=OrderHandoverDao)
 
     provider.provide(make_admin_registry, provides=AdminRegistry, scope=Scope.APP)
     provider.provide(

@@ -39,6 +39,7 @@ order-lines-truncated = … and { $count } more items in this order. A manager c
 order-cancelled-by =
     Cancelled by { $by ->
         [manager] the shop
+        [shop] the shop on its site
        *[customer] you
     }
 order-cancellation-reason = Reason: { $reason }
